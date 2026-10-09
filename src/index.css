@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+/* Identidad Millenium: el "tarrito azul", blanco y un verde de naturaleza */
+@theme {
+  --font-sans: "Onest", ui-sans-serif, system-ui, sans-serif;
+
+  --color-cobalto: #1546a0;
+  --color-cobalto-700: #10377f;
+  --color-cobalto-50: #eaf0fa;
+  --color-cobalto-100: #d3e0f5;
+  --color-tinta: #0e2a55;
+  --color-niebla: #eef3f9;
+  --color-hoja: #2f8a43;
+  --color-hoja-50: #e6f4e9;
+  --color-ambar: #b7790c;
+  --color-ambar-50: #fdf3dc;
+  --color-alerta: #c0392b;
+  --color-alerta-50: #fbe7e4;
+  --color-gris: #5d6b82;
+  --color-linea: #d9e2ee;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  background: var(--color-niebla);
+  color: var(--color-tinta);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-cobalto);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.leaflet-container {
+  font-family: var(--font-sans);
+  border-radius: 12px;
+}
