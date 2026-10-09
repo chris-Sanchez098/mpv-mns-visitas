@@ -10,6 +10,7 @@ import { capitalizar, diasHabiles, fechaCorta, fechaLarga, hoyDemo, pesos, pesos
 import { filtrar, indicadores, META_CUMPLIMIENTO, porc, type Filtros } from '../../lib/metricas'
 import { exportarVisitas } from '../../lib/excel'
 import { useDemo } from '../../store'
+import { GraficosSeguimiento } from './GraficosSeguimiento'
 
 const COLOR_ESTADO: Record<Estado, string> = {
   realizada: '#2f8a43',
@@ -189,6 +190,15 @@ export function Seguimiento() {
         </div>
       </section>
 
+      <GraficosSeguimiento
+        visitas={visitas}
+        usuarios={usuarios}
+        zonaDe={zonaDe}
+        filtros={{ zona, perfil, usuarioId }}
+        delPeriodo={vs}
+        etiquetaPeriodo={periodo === 'hoy' ? 'hoy' : 'últimos 6 días'}
+      />
+
       {/* Resultados por perfil */}
       <section className="grid gap-4 md:grid-cols-2">
         {verPerfil('vendedora') && (
@@ -337,7 +347,7 @@ export function Seguimiento() {
                 <Tooltip
                   cursor={{ fill: '#eef3f9' }}
                   formatter={(v, _n, item) => [`${v} % (${item.payload.realizadas} de ${item.payload.programadas})`, 'Cumplimiento']}
-                  contentStyle={{ borderRadius: 12, border: '1px solid #d9e2ee', fontFamily: 'Onest' }}
+                  contentStyle={{ borderRadius: 12, border: '1px solid #d9e2ee', fontFamily: 'Onest, system-ui, sans-serif' }}
                 />
                 <ReferenceLine x={Math.round(META_CUMPLIMIENTO * 100)} stroke="#0e2a55" strokeDasharray="4 4" />
                 <Bar isAnimationActive={false} dataKey="cumplimiento" fill="#1546a0" radius={[0, 4, 4, 0]} maxBarSize={22} />
