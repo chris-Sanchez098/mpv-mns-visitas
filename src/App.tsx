@@ -10,6 +10,7 @@ import { CampoLayout } from './pages/campo/CampoLayout'
 import { RutaDelDia } from './pages/campo/RutaDelDia'
 import { FlujoVisita } from './pages/campo/FlujoVisita'
 import { NuevaNoProgramada } from './pages/campo/NuevaNoProgramada'
+import { VisitasAnteriores } from './pages/campo/VisitasAnteriores'
 import { useDemo } from './store'
 import type { ReactNode } from 'react'
 
@@ -48,6 +49,7 @@ export default function App() {
           <Route index element={<RutaDelDia />} />
           <Route path="visita/:id" element={<FlujoVisita />} />
           <Route path="no-programada" element={<NuevaNoProgramada />} />
+          <Route path="anteriores" element={<VisitasAnteriores />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

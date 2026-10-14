@@ -1,19 +1,23 @@
-import { CalendarClock, CheckCircle2, Copy, Plus, Send } from 'lucide-react'
+import { CalendarClock, CheckCircle2, Copy, FileSpreadsheet, Plus, Send } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Boton, Campo, claseInput, claseSelect, EstadoChip, Modal } from '../../components/ui'
 import { PERFIL_NOMBRE, type Visita } from '../../data/types'
 import { capitalizar, diasHabiles, fechaCorta, fechaLarga, hoyDemo, siguienteHabil } from '../../lib/fechas'
 import { useDemo } from '../../store'
+import { ImportarExcel } from '../../components/ImportarExcel'
+import { COLUMNAS_PLAN, descargarPlantilla, revisarPlan } from '../../lib/importar'
+import { DEMO } from '../../data/mock'
 
 export function Planificacion() {
-  const { usuarios, puntos, visitas, listas, planPublicado, publicarPlan, agregarVisitaPlan, avisar } = useDemo()
+  const { usuarios, puntos, visitas, listas, planPublicado, publicarPlan, agregarVisitaPlan, importarPlan, avisar } = useDemo()
   const hoy = hoyDemo()
   const manana = siguienteHabil(hoy)
   const dias = [...diasHabiles(hoy, 6).slice(3), manana, siguienteHabil(manana)]
   const [fecha, setFecha] = useState(hoy)
   const [usuarioId, setUsuarioId] = useState('')
   const [agregando, setAgregando] = useState(false)
+  const [importando, setImportando] = useState(false)
   const [reprogramando, setReprogramando] = useState<Visita | null>(null)
 
   const campo = usuarios.filter((u) => u.perfil === 'impulsadora' || u.perfil === 'vendedora')
@@ -46,6 +50,26 @@ export function Planificacion() {
     avisar('Plan copiado. Revísalo y publícalo cuando esté listo')
   }
 
+  // Archivo de ejemplo: programación de mañana, una fila que actualiza una visita de hoy y dos con error
+  const ejemplo = useMemo(() => {
+    const nombre = (id: string) => usuarios.find((u) => u.id === id)?.nombre ?? ''
+    const cod = (zona: string, i: number) => puntos.filter((p) => p.zona === zona && p.ubicacionOrigen !== 'pendiente').at(i)?.codigo ?? ''
+    const deHoy = visitas.find((v) => v.fecha === hoy && v.programada && v.usuarioId === 'u-imp-2')
+    const filas: Record<string, unknown>[] = [
+      { Fecha: manana, Persona: nombre(DEMO.impulsadora), 'Código cliente': cod('Cali Norte', 0), Orden: 1, Franja: listas.franjas[0], 'Tipo de visita': 'Impulso y asesoría', Objetivo: 'Asesorar en punto de venta', 'Impacto esperado': 'Rotación +15 % en la semana' },
+      { Fecha: manana, Persona: nombre(DEMO.impulsadora), 'Código cliente': cod('Cali Norte', 3), Orden: 2, Franja: listas.franjas[2], 'Tipo de visita': 'Impulso y asesoría', Objetivo: 'Verificar exhibición y precios', 'Impacto esperado': 'Exhibición en primer nivel' },
+      { Fecha: manana, Persona: nombre(DEMO.vendedora), 'Código cliente': cod('Cali Sur', 1), Orden: 1, Franja: listas.franjas[0], 'Tipo de visita': 'Toma de pedido', Objetivo: 'Tomar pedido de reposición', 'Impacto esperado': 'Pedido estimado $ 1.800.000' },
+      { Fecha: manana, Persona: nombre(DEMO.vendedora), 'Código cliente': cod('Cali Norte', 5), Orden: 2, Franja: listas.franjas[1], 'Tipo de visita': 'Cobro de cartera', Objetivo: 'Recuperar cartera vencida', 'Impacto esperado': 'Cartera al día' },
+    ]
+    if (deHoy) {
+      const p = puntos.find((x) => x.id === deHoy.puntoId)
+      filas.push({ Fecha: hoy, Persona: nombre(deHoy.usuarioId), 'Código cliente': p?.codigo, Orden: deHoy.orden, Franja: listas.franjas[3], 'Tipo de visita': deHoy.tipo, Objetivo: deHoy.objetivo, 'Impacto esperado': deHoy.impacto })
+    }
+    filas.push({ Fecha: manana, Persona: 'Pedro Pérez', 'Código cliente': cod('Yumbo', 0), Orden: 1, Franja: listas.franjas[0], 'Tipo de visita': 'Toma de pedido', Objetivo: '', 'Impacto esperado': '' })
+    filas.push({ Fecha: manana, Persona: nombre(DEMO.vendedora), 'Código cliente': 'CL-9999', Orden: 3, Franja: listas.franjas[2], 'Tipo de visita': 'Seguimiento', Objetivo: '', 'Impacto esperado': '' })
+    return filas
+  }, [usuarios, puntos, visitas, hoy, manana, listas])
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -53,9 +77,14 @@ export function Planificacion() {
           <h1 className="text-2xl font-bold">Planificación de visitas</h1>
           <p className="mt-1 text-gris">El plan publicado es la base contra la que se mide el cumplimiento.</p>
         </div>
-        <Boton onClick={() => setAgregando(true)}>
-          <Plus size={18} aria-hidden /> Agregar visita al plan
-        </Boton>
+        <div className="flex flex-wrap gap-2">
+          <Boton variante="secundario" onClick={() => setImportando(true)}>
+            <FileSpreadsheet size={18} aria-hidden /> Cargar programación desde Excel
+          </Boton>
+          <Boton onClick={() => setAgregando(true)}>
+            <Plus size={18} aria-hidden /> Agregar visita al plan
+          </Boton>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -190,6 +219,23 @@ export function Planificacion() {
         )}
       </div>
 
+      {importando && (
+        <ImportarExcel
+          titulo="Cargar programación desde Excel"
+          explicacion="Carga el plan de visitas de varios días y personas en un solo archivo. Las visitas quedan en borrador hasta que publiques el plan de cada día."
+          llave="persona, cliente y fecha identifican cada visita. Si esa visita ya está programada, la fila la actualiza (orden, franja, objetivo) en lugar de duplicarla."
+          ejemplo={ejemplo}
+          onDescargarPlantilla={() => descargarPlantilla('plantilla-programacion.xlsx', COLUMNAS_PLAN, ejemplo.slice(0, 4))}
+          revisar={(filas) => revisarPlan(filas, usuarios, puntos, visitas, listas)}
+          onConfirmar={(validas) => {
+            const r = importarPlan(validas)
+            avisar(`Programación cargada: ${r.nuevas} visitas nuevas y ${r.actualizadas} actualizadas. Publica el plan para que las vean en campo`)
+            setImportando(false)
+            if (validas[0]) setFecha(validas[0].fecha)
+          }}
+          onCerrar={() => setImportando(false)}
+        />
+      )}
       {agregando && <ModalAgregar fecha={fecha} usuarioInicial={usuarioId} onCerrar={() => setAgregando(false)} listas={listas} />}
       {reprogramando && <ModalReprogramar visita={reprogramando} onCerrar={() => setReprogramando(null)} />}
     </div>

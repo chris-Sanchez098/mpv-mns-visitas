@@ -1,7 +1,9 @@
-import { FileSpreadsheet, MapPin, Plus, Search } from 'lucide-react'
+import { FileSpreadsheet, MapPin, MapPinOff, MapPinPlus, Plus, Search } from 'lucide-react'
 import { useState } from 'react'
-import * as XLSX from 'xlsx'
+import { ImportarExcel } from '../../components/ImportarExcel'
 import { Boton, Campo, claseInput, claseSelect, Modal } from '../../components/ui'
+import { COLUMNAS_CLIENTES, descargarPlantilla, revisarClientes } from '../../lib/importar'
+import { fechaCorta } from '../../lib/fechas'
 import { PERFIL_NOMBRE, type Listas, type Perfil } from '../../data/types'
 import { useDemo } from '../../store'
 
@@ -16,15 +18,19 @@ const NOMBRE_LISTA: Record<keyof Listas, string> = {
   motivosNoRealizacion: 'Motivos de no realización',
   productos: 'Productos',
   actividades: 'Actividades de impulso',
+  gestiones: 'Gestiones de vendedoras',
+  motivosNovedad: 'Motivos de novedad posterior',
   franjas: 'Franjas horarias',
 }
 
-function descargarPlantilla() {
-  const libro = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(libro, XLSX.utils.aoa_to_sheet([['Nombre', 'Perfil', 'Zonas', 'Teléfono']]), 'Usuarios')
-  XLSX.utils.book_append_sheet(libro, XLSX.utils.aoa_to_sheet([['Nombre', 'Canal', 'Zona', 'Dirección', 'Contacto', 'Latitud', 'Longitud']]), 'Puntos de venta')
-  XLSX.writeFile(libro, 'plantilla-carga-inicial.xlsx')
-}
+/** Filas de ejemplo: 3 clientes nuevos (uno sin dirección), 1 que actualiza un código existente y 1 con error. */
+const EJEMPLO_CLIENTES = [
+  { 'Código': 'CL-2001', Nombre: 'Droguería Santa Isabel', Canal: 'Droguería', Zona: 'Cali Sur', 'Dirección': 'Calle 5 # 66-20', Contacto: 'Marta Ríos', Latitud: 3.3795, Longitud: -76.5401 },
+  { 'Código': 'CL-2002', Nombre: 'Naturista Vida Plena', Canal: 'Tienda naturista', Zona: 'Palmira', 'Dirección': 'Carrera 28 # 30-15', Contacto: 'Luis Arce', Latitud: '', Longitud: '' },
+  { 'Código': 'CL-2003', Nombre: 'Minimercado El Paraíso', Canal: 'Supermercado', Zona: 'Jamundí', 'Dirección': '', Contacto: 'Nubia Peña', Latitud: '', Longitud: '' },
+  { 'Código': 'CL-1003', Nombre: 'Droguería Vipasa', Canal: 'Droguería', Zona: 'Cali Norte', 'Dirección': 'Avenida 6N # 52-10', Contacto: 'Hernán Sierra', Latitud: '', Longitud: '' },
+  { 'Código': 'CL-2004', Nombre: 'Farmacia La 70', Canal: 'Farmacia de cadena', Zona: 'Buga', 'Dirección': 'Calle 70 # 2-10', Contacto: '', Latitud: '', Longitud: '' },
+]
 
 export function Administracion() {
   const [pestaña, setPestaña] = useState<Pestaña>('usuarios')
@@ -35,9 +41,6 @@ export function Administracion() {
           <h1 className="text-2xl font-bold">Administración</h1>
           <p className="mt-1 text-gris">La información base de la operación, mantenida por la compañía.</p>
         </div>
-        <Boton variante="secundario" onClick={descargarPlantilla}>
-          <FileSpreadsheet size={17} aria-hidden /> Descargar plantilla de carga
-        </Boton>
       </div>
       <div className="flex gap-1 border-b border-linea" role="tablist">
         {(
@@ -180,11 +183,13 @@ function ModalUsuario({ zonas, onCerrar, onGuardar }: { zonas: string[]; onCerra
 }
 
 function Puntos() {
-  const { puntos, listas, agregarPunto, avisar } = useDemo()
+  const { puntos, listas, agregarPunto, importarPuntos, avisar } = useDemo()
   const [zona, setZona] = useState('')
   const [nuevo, setNuevo] = useState(false)
-  const [f, setF] = useState({ nombre: '', canal: listas.canales[0], zona: listas.zonas[0], direccion: '', contacto: '' })
+  const [importando, setImportando] = useState(false)
+  const [f, setF] = useState({ codigo: '', nombre: '', canal: listas.canales[0], zona: listas.zonas[0], direccion: '', contacto: '' })
   const lista = puntos.filter((p) => !zona || p.zona === zona)
+  const sinDireccion = puntos.filter((p) => !p.direccion).length
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -194,15 +199,22 @@ function Puntos() {
             <option key={z}>{z}</option>
           ))}
         </select>
-        <Boton onClick={() => setNuevo(true)}>
-          <Plus size={17} aria-hidden /> Agregar punto de venta
-        </Boton>
+        <span className="text-sm text-gris">{sinDireccion} clientes sin dirección completa</span>
+        <div className="ml-auto flex flex-wrap gap-2">
+          <Boton variante="secundario" onClick={() => setImportando(true)}>
+            <FileSpreadsheet size={17} aria-hidden /> Cargar desde Excel
+          </Boton>
+          <Boton onClick={() => setNuevo(true)}>
+            <Plus size={17} aria-hidden /> Agregar punto de venta
+          </Boton>
+        </div>
       </div>
       <div className="overflow-x-auto rounded-2xl border border-linea bg-white">
-        <table className="w-full min-w-[820px] text-sm">
+        <table className="w-full min-w-[960px] text-sm">
           <thead className="border-b border-linea text-left text-xs text-gris">
             <tr>
-              <th className="px-5 py-3 font-medium">Punto de venta</th>
+              <th className="px-5 py-3 font-medium">Código</th>
+              <th className="py-3 font-medium">Punto de venta</th>
               <th className="py-3 font-medium">Canal</th>
               <th className="py-3 font-medium">Zona</th>
               <th className="py-3 font-medium">Dirección</th>
@@ -213,16 +225,24 @@ function Puntos() {
           <tbody className="divide-y divide-linea">
             {lista.map((p) => (
               <tr key={p.id}>
-                <td className="px-5 py-2.5 font-medium">{p.nombre}</td>
+                <td className="px-5 py-2.5 text-gris tabular">{p.codigo}</td>
+                <td className="py-2.5 font-medium">{p.nombre}</td>
                 <td className="py-2.5">{p.canal}</td>
                 <td className="py-2.5">{p.zona}</td>
-                <td className="py-2.5 text-gris">{p.direccion}</td>
+                <td className="py-2.5 text-gris">{p.direccion || <span className="rounded-full bg-ambar-50 px-2 py-0.5 text-xs font-medium text-ambar">Sin dirección</span>}</td>
                 <td className="py-2.5">{p.contacto}</td>
                 <td className="px-5 py-2.5 text-xs text-gris tabular">
-                  <span className="inline-flex items-center gap-1">
-                    <MapPin size={13} aria-hidden />
-                    {p.lat.toFixed(4)}, {p.lng.toFixed(4)}
-                  </span>
+                  {p.lat === undefined || p.lng === undefined ? (
+                    <span className="inline-flex items-center gap-1 text-ambar">
+                      <MapPinOff size={13} aria-hidden /> Se toma en la primera visita
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1" title={p.ubicacionOrigen === 'visita' ? 'Ubicación tomada con el GPS en una visita' : 'Ubicación de la base de datos'}>
+                      {p.ubicacionOrigen === 'visita' ? <MapPinPlus size={13} className="text-cobalto" aria-hidden /> : <MapPin size={13} aria-hidden />}
+                      {p.lat.toFixed(4)}, {p.lng.toFixed(4)}
+                      {p.ubicacionOrigen === 'visita' && p.ubicacionFecha && <span className="text-cobalto">· visita {fechaCorta(p.ubicacionFecha)}</span>}
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -236,12 +256,14 @@ function Puntos() {
             onSubmit={(e) => {
               e.preventDefault()
               if (!f.nombre.trim()) return
-              const base = puntos.find((p) => p.zona === f.zona)!
-              agregarPunto({ ...f, nombre: f.nombre.trim(), lat: base.lat + 0.004, lng: base.lng - 0.003, contacto: f.contacto || '—' })
+              agregarPunto({ ...f, codigo: f.codigo.trim() || `CL-${3000 + puntos.length}`, nombre: f.nombre.trim(), contacto: f.contacto || '—', ubicacionOrigen: 'pendiente' })
               avisar(`${f.nombre} quedó disponible para planificar visitas`)
               setNuevo(false)
             }}
           >
+            <Campo etiqueta="Código del cliente" ayuda="El mismo código del sistema comercial. Evita duplicados en las cargas por Excel.">
+              <input className={claseInput} value={f.codigo} onChange={(e) => setF({ ...f, codigo: e.target.value })} placeholder="Ej.: CL-3001" />
+            </Campo>
             <Campo etiqueta="Nombre del punto">
               <input required className={claseInput} value={f.nombre} onChange={(e) => setF({ ...f, nombre: e.target.value })} placeholder="Ej.: Droguería La Merced" />
             </Campo>
@@ -261,7 +283,7 @@ function Puntos() {
                 </select>
               </Campo>
             </div>
-            <Campo etiqueta="Dirección" ayuda="Si no se conocen las coordenadas, se toman en la primera visita registrada.">
+            <Campo etiqueta="Dirección" ayuda="Opcional. Si el cliente no tiene dirección, la ubicación se toma con el GPS en la primera visita.">
               <input className={claseInput} value={f.direccion} onChange={(e) => setF({ ...f, direccion: e.target.value })} placeholder="Calle 5 # 38-20" />
             </Campo>
             <Campo etiqueta="Contacto en el punto">
@@ -275,6 +297,22 @@ function Puntos() {
             </div>
           </form>
         </Modal>
+      )}
+      {importando && (
+        <ImportarExcel
+          titulo="Cargar clientes desde Excel"
+          explicacion="Carga o actualiza clientes y puntos de venta en bloque. La dirección y las coordenadas son opcionales: si faltan, la ubicación se toma en la primera visita."
+          llave="el código del cliente. Si el código ya existe, la fila actualiza ese cliente en lugar de crear uno nuevo."
+          ejemplo={EJEMPLO_CLIENTES}
+          onDescargarPlantilla={() => descargarPlantilla('plantilla-clientes.xlsx', COLUMNAS_CLIENTES, EJEMPLO_CLIENTES.slice(0, 3))}
+          revisar={(filas) => revisarClientes(filas, puntos, listas)}
+          onConfirmar={(validas) => {
+            const r = importarPuntos(validas)
+            avisar(`Carga lista: ${r.nuevos} clientes nuevos y ${r.actualizados} actualizados`)
+            setImportando(false)
+          }}
+          onCerrar={() => setImportando(false)}
+        />
       )}
     </>
   )

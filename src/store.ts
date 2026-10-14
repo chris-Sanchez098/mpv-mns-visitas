@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
-import { generarDatos, type DatosDemo } from './data/mock'
-import type { GestionImpulsadora, GestionVendedora, Punto, Usuario, Visita } from './data/types'
-import { hoyDemo, siguienteHabil } from './lib/fechas'
+import { generarDatos, ZONAS, type DatosDemo } from './data/mock'
+import type { GestionImpulsadora, GestionVendedora, NovedadPosterior, Punto, Usuario, Visita } from './data/types'
+import { horaActual, hoyDemo, siguienteHabil } from './lib/fechas'
 
 interface Aviso {
   id: number
@@ -24,14 +24,18 @@ interface Estado extends DatosDemo {
 
   agregarUsuario: (u: Omit<Usuario, 'id'>) => void
   agregarPunto: (p: Omit<Punto, 'id'>) => void
+  importarPuntos: (filas: Omit<Punto, 'id'>[]) => { nuevos: number; actualizados: number }
+  importarPlan: (filas: Omit<Visita, 'id' | 'historial' | 'sync' | 'estado' | 'programada' | 'novedadesPosteriores'>[]) => { nuevas: number; actualizadas: number }
   agregarALista: (lista: keyof DatosDemo['listas'], valor: string) => void
 
-  agregarVisitaPlan: (v: Omit<Visita, 'id' | 'historial' | 'sync' | 'estado' | 'programada'>) => void
+  agregarVisitaPlan: (v: Omit<Visita, 'id' | 'historial' | 'sync' | 'estado' | 'programada' | 'novedadesPosteriores'>) => void
   publicarPlan: (fecha: string) => void
   reprogramar: (id: string, nuevaFecha: string) => void
 
   registrarLlegada: (id: string, datos: { hora: string; distanciaM: number; enRango: boolean }) => void
-  guardarFoto: (id: string, foto: string) => void
+  guardarFoto: (id: string, foto: string, tipo: 'presencia' | 'exhibicion') => void
+  usarFotoDemo: (id: string, tipo: 'presencia' | 'exhibicion') => void
+  agregarNovedad: (visitaId: string, n: Pick<NovedadPosterior, 'motivo' | 'detalle' | 'autor'>) => void
   finalizarVisita: (id: string, hora: string, gestion: { vendedora?: GestionVendedora; impulsadora?: GestionImpulsadora }) => void
   marcarNoRealizada: (id: string, motivo: string) => void
   crearNoProgramada: (usuarioId: string, puntoId: string, motivo: string) => string
@@ -74,6 +78,50 @@ export const useDemo = create<Estado>()(
 
         agregarUsuario: (u) => set((s) => ({ usuarios: [...s.usuarios, { ...u, id: `u-nuevo-${Date.now()}` }] })),
         agregarPunto: (p) => set((s) => ({ puntos: [...s.puntos, { ...p, id: `p-nuevo-${Date.now()}` }] })),
+        // El código del cliente evita duplicados: si ya existe, se actualiza
+        importarPuntos: (filas) => {
+          let nuevos = 0
+          let actualizados = 0
+          set((s) => {
+            const puntos = [...s.puntos]
+            filas.forEach((f, i) => {
+              const k = puntos.findIndex((p) => p.codigo.toLowerCase() === f.codigo.toLowerCase())
+              if (k >= 0) {
+                puntos[k] = { ...puntos[k], ...f, lat: f.lat ?? puntos[k].lat, lng: f.lng ?? puntos[k].lng, ubicacionOrigen: f.lat ? 'base' : puntos[k].ubicacionOrigen }
+                actualizados++
+              } else {
+                puntos.push({ ...f, id: `p-xl-${Date.now()}-${i}` })
+                nuevos++
+              }
+            })
+            return { puntos }
+          })
+          return { nuevos, actualizados }
+        },
+        // Persona + cliente + fecha identifican la visita: si ya está programada, se actualiza
+        importarPlan: (filas) => {
+          let nuevas = 0
+          let actualizadas = 0
+          set((s) => {
+            const visitas = [...s.visitas]
+            const fechas = new Set<string>()
+            filas.forEach((f, i) => {
+              fechas.add(f.fecha)
+              const k = visitas.findIndex((v) => v.programada && v.usuarioId === f.usuarioId && v.puntoId === f.puntoId && v.fecha === f.fecha)
+              if (k >= 0) {
+                visitas[k] = { ...visitas[k], ...f, historial: [...visitas[k].historial, 'Actualizada desde Excel'] }
+                actualizadas++
+              } else {
+                visitas.push({ ...f, id: `v-xl-${Date.now()}-${i}`, estado: 'programada', programada: true, historial: ['Cargada desde Excel'], novedadesPosteriores: [], sync: 'sincronizada' })
+                nuevas++
+              }
+            })
+            const planPublicado = { ...s.planPublicado }
+            fechas.forEach((f) => (planPublicado[f] = false))
+            return { visitas, planPublicado }
+          })
+          return { nuevas, actualizadas }
+        },
         agregarALista: (lista, valor) =>
           set((s) => ({ listas: { ...s.listas, [lista]: [...s.listas[lista], valor] } })),
 
@@ -81,7 +129,7 @@ export const useDemo = create<Estado>()(
           set((s) => ({
             visitas: [
               ...s.visitas,
-              { ...v, id: `v-plan-${Date.now()}`, estado: 'programada', programada: true, historial: ['Agregada al plan'], sync: 'sincronizada' },
+              { ...v, id: `v-plan-${Date.now()}`, estado: 'programada', programada: true, historial: ['Agregada al plan'], novedadesPosteriores: [], sync: 'sincronizada' },
             ],
             planPublicado: { ...s.planPublicado, [v.fecha]: false },
           })),
@@ -102,6 +150,7 @@ export const useDemo = create<Estado>()(
                 origenId: v.id,
                 orden: v.orden,
                 historial: [`Viene de una visita reprogramada del ${v.fecha}`],
+                novedadesPosteriores: [],
                 llegada: undefined,
                 salida: undefined,
               },
@@ -109,9 +158,29 @@ export const useDemo = create<Estado>()(
           }))
         },
 
-        registrarLlegada: (id, d) =>
-          editar(id, (v) => ({ ...v, llegada: d.hora, distanciaM: d.distanciaM, enRango: d.enRango })),
-        guardarFoto: (id, foto) => editar(id, (v) => ({ ...v, foto })),
+        registrarLlegada: (id, d) => {
+          const v = get().visitas.find((x) => x.id === id)
+          const p = get().puntos.find((x) => x.id === v?.puntoId)
+          // Cliente sin coordenadas: la ubicación de esta visita queda como referencia del punto
+          if (v && p && p.lat === undefined) {
+            const z = ZONAS[p.zona]
+            set((s) => ({
+              puntos: s.puntos.map((x) =>
+                x.id === p.id ? { ...x, lat: z.lat + 0.006, lng: z.lng - 0.004, ubicacionOrigen: 'visita' as const, ubicacionFecha: v.fecha } : x,
+              ),
+            }))
+            editar(id, (x) => ({ ...x, llegada: d.hora, ubicacionTomada: true, distanciaM: undefined, enRango: undefined }))
+            return
+          }
+          editar(id, (x) => ({ ...x, llegada: d.hora, distanciaM: d.distanciaM, enRango: d.enRango }))
+        },
+        guardarFoto: (id, foto, tipo) => editar(id, (v) => (tipo === 'presencia' ? { ...v, foto } : { ...v, fotoExhibicion: foto })),
+        usarFotoDemo: (id, tipo) => editar(id, (v) => (tipo === 'presencia' ? { ...v, fotoSemilla: 4242 } : { ...v, fotoExhibicionSemilla: 2424 })),
+        agregarNovedad: (visitaId, n) =>
+          editar(visitaId, (v) => ({
+            ...v,
+            novedadesPosteriores: [...v.novedadesPosteriores, { ...n, id: `n-${Date.now()}`, fecha: hoyDemo(), hora: horaActual() }],
+          })),
         finalizarVisita: (id, hora, g) =>
           editar(id, (v) => ({
             ...v,
@@ -148,6 +217,7 @@ export const useDemo = create<Estado>()(
                 estado: 'programada',
                 motivoNoProgramada: motivo,
                 historial: ['Registrada en campo como no programada'],
+                novedadesPosteriores: [],
                 sync: 'sincronizada',
               },
             ],
@@ -171,7 +241,7 @@ export const useDemo = create<Estado>()(
       }
     },
     {
-      name: 'mns-demo-v1',
+      name: 'mns-demo-v2',
       storage: createJSONStorage(() => {
         try {
           localStorage.setItem('__t', '1')

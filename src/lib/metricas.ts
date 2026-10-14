@@ -43,15 +43,46 @@ export function indicadores(vs: Visita[]) {
     avance: plan.length ? realizadas / plan.length : 0,
     adicionales: adicionales.length,
     fueraDeRango: hechas.filter((v) => v.enRango === false).length,
-    pedidos: ven.reduce((s, v) => s + (v.vendedora?.valorPedido ?? 0), 0),
-    recaudo: ven.reduce((s, v) => s + (v.vendedora?.recaudo ?? 0), 0),
-    efectividadVenta: ven.length ? ven.filter((v) => (v.vendedora?.valorPedido ?? 0) > 0).length / ven.length : 0,
+    pedidos: ven.reduce((s, v) => s + (v.vendedora?.estimadoPedido ?? 0), 0),
+    unidadesPedido: ven.reduce((s, v) => s + (v.vendedora?.unidadesPedido ?? 0), 0),
+    carteraVencida: new Set(ven.filter((v) => v.vendedora?.estadoCartera === 'Vencida').map((v) => v.puntoId)).size,
+    clientesVisitados: new Set(ven.map((v) => v.puntoId)).size,
+    efectividadVenta: ven.length ? ven.filter((v) => (v.vendedora?.estimadoPedido ?? 0) > 0).length / ven.length : 0,
     unidades: imp.reduce((s, v) => s + (v.impulsadora?.unidades ?? 0), 0),
-    agotados: imp.reduce((s, v) => s + (v.impulsadora?.agotados.length ?? 0), 0),
+    faltantes: hechas.reduce((s, v) => s + faltantesDe(v).length, 0),
+    novedadesPosteriores: vs.reduce((s, v) => s + v.novedadesPosteriores.length, 0),
     exhibicionDeficiente: imp.filter((v) => v.impulsadora?.exhibicion === 'Deficiente').length,
   }
 }
 
 export function porc(x: number): string {
   return `${Math.round(x * 100)} %`
+}
+
+export function faltantesDe(v: Visita) {
+  return v.vendedora?.faltantes ?? v.impulsadora?.faltantes ?? []
+}
+
+/** Referencias faltantes del periodo, sumando cantidades, de mayor a menor */
+export function resumenFaltantes(vs: Visita[]) {
+  const m = new Map<string, { cantidad: number; puntos: Set<string> }>()
+  vs.filter((v) => v.estado === 'realizada').forEach((v) =>
+    faltantesDe(v).forEach((f) => {
+      const x = m.get(f.producto) ?? { cantidad: 0, puntos: new Set<string>() }
+      x.cantidad += f.cantidad
+      x.puntos.add(v.puntoId)
+      m.set(f.producto, x)
+    }),
+  )
+  return [...m.entries()].map(([producto, x]) => ({ producto, cantidad: x.cantidad, puntos: x.puntos.size })).sort((a, b) => b.cantidad - a.cantidad)
+}
+
+/** Cuántas veces se registró cada actividad (impulsadoras) o gestión (vendedoras) */
+export function resumenActividades(vs: Visita[]) {
+  const m = new Map<string, number>()
+  vs.filter((v) => v.estado === 'realizada').forEach((v) => {
+    const xs = v.impulsadora ? v.impulsadora.actividades : v.vendedora ? [v.vendedora.gestion] : []
+    xs.forEach((x) => m.set(x, (m.get(x) ?? 0) + 1))
+  })
+  return [...m.entries()].map(([nombre, n]) => ({ nombre, n })).sort((a, b) => b.n - a.n)
 }

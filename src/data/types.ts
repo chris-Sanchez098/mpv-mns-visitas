@@ -19,13 +19,33 @@ export interface Usuario {
 
 export interface Punto {
   id: string
+  /** Código del cliente: llave para la carga por Excel sin duplicados */
+  codigo: string
   nombre: string
   canal: string
   zona: string
+  /** Puede venir vacío: hay clientes sin dirección completa en la base de datos */
   direccion: string
   contacto: string
-  lat: number
-  lng: number
+  /** Sin coordenadas hasta la primera visita, que las toma con el GPS */
+  lat?: number
+  lng?: number
+  ubicacionOrigen: 'base' | 'visita' | 'pendiente'
+  ubicacionFecha?: string
+}
+
+export interface Faltante {
+  producto: string
+  cantidad: number
+}
+
+export interface NovedadPosterior {
+  id: string
+  fecha: string
+  hora: string
+  autor: string
+  motivo: string
+  detalle: string
 }
 
 export type Estado = 'programada' | 'realizada' | 'no_realizada' | 'reprogramada'
@@ -37,11 +57,17 @@ export const ESTADO_NOMBRE: Record<Estado, string> = {
   reprogramada: 'Reprogramada',
 }
 
+export type EstadoCartera = 'Al día' | 'Vencida'
+
 export interface GestionVendedora {
   gestion: string
-  valorPedido: number
-  recaudo: number
+  /** Descripción cuando la gestión es "Otros" */
+  gestionOtro?: string
+  estimadoPedido: number
+  unidadesPedido: number
   motivoNoVenta?: string
+  estadoCartera: EstadoCartera
+  faltantes: Faltante[]
   seguimiento: string
   novedades: string
   proximaAccion: string
@@ -51,10 +77,11 @@ export interface GestionVendedora {
 
 export interface GestionImpulsadora {
   asistencia: boolean
-  agotados: string[]
+  faltantes: Faltante[]
   unidades: number
   exhibicion: 'Buena' | 'Regular' | 'Deficiente'
   pop: boolean
+  popObservaciones: string
   promociones: string
   actividades: string[]
   competencia: string
@@ -78,8 +105,14 @@ export interface Visita {
   salida?: string
   distanciaM?: number
   enRango?: boolean
+  /** Vendedora: foto de inicio de jornada (solo en la primera visita del día). Impulsadora: foto de llegada al almacén. */
   foto?: string // dataURL de una foto tomada en la demo
   fotoSemilla?: number // foto ilustrada de demostración
+  /** Impulsadora: foto de la exhibición de los productos */
+  fotoExhibicion?: string
+  fotoExhibicionSemilla?: number
+  /** La visita tomó la ubicación de un cliente que no la tenía */
+  ubicacionTomada?: boolean
   motivoNoRealizacion?: string
   motivoNoProgramada?: string
   reprogramadaPara?: string
@@ -87,6 +120,8 @@ export interface Visita {
   historial: string[]
   vendedora?: GestionVendedora
   impulsadora?: GestionImpulsadora
+  /** Novedades registradas después de cerrar la visita; el registro original no cambia */
+  novedadesPosteriores: NovedadPosterior[]
   sync: 'sincronizada' | 'pendiente'
 }
 
@@ -99,5 +134,7 @@ export interface Listas {
   motivosNoRealizacion: string[]
   productos: string[]
   actividades: string[]
+  gestiones: string[]
+  motivosNovedad: string[]
   franjas: string[]
 }

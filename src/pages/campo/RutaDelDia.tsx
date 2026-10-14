@@ -1,4 +1,4 @@
-import { ChevronRight, CloudOff, Plus } from 'lucide-react'
+import { ChevronRight, CloudOff, History, Plus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { EstadoChip } from '../../components/ui'
 import { capitalizar, fechaLarga, hoyDemo } from '../../lib/fechas'
@@ -59,6 +59,7 @@ export function RutaDelDia() {
                   </span>
                   <span className="mt-1.5 flex items-center gap-1.5">
                     <EstadoChip estado={v.estado} pequeño />
+                    {p?.ubicacionOrigen === 'pendiente' && <span className="rounded-full bg-cobalto-50 px-2 py-0.5 text-xs font-medium text-cobalto">Sin dirección</span>}
                     {v.sync === 'pendiente' && (
                       <span className="inline-flex items-center gap-1 text-xs text-ambar">
                         <CloudOff size={12} aria-hidden /> Por sincronizar
@@ -94,6 +95,9 @@ export function RutaDelDia() {
 
       <Link to="/campo/no-programada" className="mt-5 flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-cobalto-100 p-3.5 font-semibold text-cobalto hover:bg-white">
         <Plus size={18} aria-hidden /> Registrar visita no programada
+      </Link>
+      <Link to="/campo/anteriores" className="mt-2 flex items-center justify-center gap-2 rounded-2xl p-3 text-sm font-semibold text-gris hover:bg-white">
+        <History size={16} aria-hidden /> Visitas anteriores y novedades
       </Link>
     </div>
   )

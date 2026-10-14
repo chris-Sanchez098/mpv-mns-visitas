@@ -42,7 +42,7 @@ export function NuevaNoProgramada() {
               >
                 <span className="block text-sm font-semibold">{p.nombre}</span>
                 <span className="block text-xs text-gris">
-                  {p.direccion} · {p.zona}
+                  {p.codigo} · {p.direccion || 'Sin dirección registrada'} · {p.zona}
                 </span>
               </button>
             </li>

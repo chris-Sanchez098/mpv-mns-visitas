@@ -1,5 +1,5 @@
 import { diasHabiles, hoyDemo } from '../lib/fechas'
-import type { Listas, Punto, Usuario, Visita, Estado } from './types'
+import type { Estado, Faltante, Listas, Punto, Usuario, Visita } from './types'
 
 /** Generador pseudoaleatorio con semilla: la demo siempre arranca igual. */
 function crearAzar(semilla: number) {
@@ -42,11 +42,13 @@ export const LISTAS_INICIALES: Listas = {
     'Vitamina C 1000',
     'Complejo B',
   ],
-  actividades: ['Asesoría a compradores', 'Organización de góndola', 'Conteo de inventario', 'Activación de marca', 'Instalación de material POP', 'Degustación de producto'],
+  actividades: ['Asesoría a compradores', 'Organización de góndola', 'Conteo de inventario', 'Activación de marca', 'Instalación de material POP', 'Degustación de producto', 'Capacitación'],
+  gestiones: ['Toma de pedido', 'Seguimiento', 'Cobro de cartera', 'Presentación de producto', 'Negociación de exhibición', 'Capacitación', 'Otros'],
+  motivosNovedad: ['Devolución de productos', 'Cambio en el pedido', 'Reclamo del cliente', 'Pago o ajuste de cartera', 'Otro'],
   franjas: ['8:00 – 10:00', '10:00 – 12:00', '14:00 – 16:00', '16:00 – 18:00'],
 }
 
-const ZONAS: Record<string, { lat: number; lng: number; barrios: string[] }> = {
+export const ZONAS: Record<string, { lat: number; lng: number; barrios: string[] }> = {
   'Cali Norte': { lat: 3.472, lng: -76.523, barrios: ['Chipichape', 'La Flora', 'Vipasa', 'Los Andes', 'Prados del Norte', 'Santa Mónica', 'Versalles', 'Granada'] },
   'Cali Sur': { lat: 3.378, lng: -76.535, barrios: ['Ciudad Jardín', 'El Ingenio', 'Valle del Lili', 'Pance', 'Capri', 'Meléndez', 'El Caney', 'Limonar'] },
   'Cali Oeste': { lat: 3.446, lng: -76.548, barrios: ['San Antonio', 'El Peñón', 'Santa Teresita', 'Normandía', 'Bellavista', 'Arboleda', 'Centenario', 'Juanambú'] },
@@ -103,6 +105,8 @@ export function generarDatos(): DatosDemo {
       const canal = LISTAS_INICIALES.canales[(bi + zi) % 4]
       puntos.push({
         id: `p-${zi}-${bi}`,
+        codigo: `CL-${1001 + zi * 8 + bi}`,
+        ubicacionOrigen: 'base',
         nombre: `${a.uno(NOMBRE_CANAL[canal])} ${barrio}`,
         canal,
         zona,
@@ -113,6 +117,19 @@ export function generarDatos(): DatosDemo {
       })
     })
   })
+
+  // Clientes sin dirección completa: la ubicación se tomó con el GPS en una visita
+  ;[puntos[5], puntos[21], puntos[37]].forEach((p) => {
+    p.direccion = ''
+    p.ubicacionOrigen = 'visita'
+    p.ubicacionFecha = dias[1]
+  })
+  // Dos clientes nuevos sin dirección ni coordenadas: los visitan hoy las usuarias de la demo
+  const sinUbicacion: Punto[] = [
+    { id: 'p-sd-1', codigo: 'CL-1049', nombre: 'Tienda Naturista Doña Rosa', canal: 'Tienda naturista', zona: 'Cali Norte', direccion: '', contacto: 'Rosa Valencia', ubicacionOrigen: 'pendiente' },
+    { id: 'p-sd-2', codigo: 'CL-1050', nombre: 'Minimercado La Esperanza', canal: 'Supermercado', zona: 'Cali Norte', direccion: '', contacto: 'Álvaro Pinto', ubicacionOrigen: 'pendiente' },
+  ]
+  puntos.push(...sinUbicacion)
 
   // Usuarios
   const usuarios: Usuario[] = [
@@ -134,7 +151,7 @@ export function generarDatos(): DatosDemo {
     })),
     { id: 'u-sup-1', nombre: 'Jorge Caicedo', perfil: 'supervision', zonas: [...zonas], telefono: tel(), activo: true },
     { id: 'u-adm-1', nombre: 'Martha Lucía Vélez', perfil: 'administracion', zonas: [...zonas], telefono: tel(), activo: true },
-    { id: 'u-dir-1', nombre: 'Ana María Holguín', perfil: 'direccion', zonas: [...zonas], telefono: tel(), activo: true },
+    { id: 'u-dir-1', nombre: 'Edison Muñoz', perfil: 'direccion', zonas: [...zonas], telefono: tel(), activo: true },
   ]
 
   // Cumplimiento base por persona: dos personas quedan por debajo de la meta para mostrar desviaciones.
@@ -143,15 +160,18 @@ export function generarDatos(): DatosDemo {
   const visitas: Visita[] = []
   let n = 0
   const L = LISTAS_INICIALES
+  const faltantes = (prob: number): Faltante[] =>
+    a.r() < prob ? a.varios(L.productos, a.entre(1, 2)).map((producto) => ({ producto, cantidad: a.entre(2, 24) })) : []
 
   for (const u of usuarios.filter((x) => x.perfil === 'impulsadora' || x.perfil === 'vendedora')) {
     const esVen = u.perfil === 'vendedora'
-    const misPuntos = puntos.filter((p) => u.zonas.includes(p.zona))
+    const misPuntos = puntos.filter((p) => u.zonas.includes(p.zona) && p.ubicacionOrigen !== 'pendiente')
     const exito = sesgo[u.id] ?? 0.88
     const esDemo = u.id === DEMO.impulsadora || u.id === DEMO.vendedora
 
     dias.forEach((fecha) => {
       const esHoy = fecha === hoy
+      let fotoJornada = false
       const cantidad = esVen ? a.entre(5, 6) : a.entre(3, 4)
       const elegidos = a.varios(misPuntos, cantidad)
       // Hoy: la mitad de la ruta ya se hizo, salvo para los usuarios de la demo, que la recorren en vivo.
@@ -175,7 +195,8 @@ export function generarDatos(): DatosDemo {
         const v: Visita = {
           id: `v-${++n}`,
           usuarioId: u.id,
-          puntoId: p.id,
+          // La segunda visita de hoy de las usuarias de la demo es a un cliente sin dirección
+          puntoId: esDemo && esHoy && i === 1 ? (esVen ? 'p-sd-2' : 'p-sd-1') : p.id,
           fecha,
           orden: i + 1,
           franja: fr,
@@ -185,9 +206,13 @@ export function generarDatos(): DatosDemo {
           programada: true,
           estado,
           historial: [`Plan publicado por Jorge Caicedo`],
+          novedadesPosteriores: [],
           sync: 'sincronizada',
         }
-        if (estado === 'realizada') completar(v, esVen, inicio)
+        if (estado === 'realizada') {
+          completar(v, esVen, inicio, !fotoJornada)
+          fotoJornada = true
+        }
         if (estado === 'no_realizada') v.motivoNoRealizacion = a.uno(L.motivosNoRealizacion)
         if (estado === 'reprogramada') {
           v.historial.push('Reprogramada por supervisión')
@@ -213,15 +238,18 @@ export function generarDatos(): DatosDemo {
           estado: 'realizada',
           motivoNoProgramada: a.uno(['El cliente llamó a pedir producto', 'Punto cercano a la ruta', 'Reposición urgente por agotado']),
           historial: ['Registrada en campo como no programada'],
+          novedadesPosteriores: [],
           sync: 'sincronizada',
         }
-        completar(v, esVen, 15 * 60 + a.entre(0, 90))
+        completar(v, esVen, 15 * 60 + a.entre(0, 90), !fotoJornada)
+        fotoJornada = true
         visitas.push(v)
       }
     })
   }
 
-  function completar(v: Visita, esVen: boolean, inicioMin: number) {
+  /** primeraDelDia: la vendedora solo toma foto en la primera visita de su jornada */
+  function completar(v: Visita, esVen: boolean, inicioMin: number, primeraDelDia: boolean) {
     const dur = a.entre(25, 55)
     const hh = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
     v.llegada = hh(inicioMin)
@@ -229,13 +257,19 @@ export function generarDatos(): DatosDemo {
     const fuera = a.r() < 0.07
     v.enRango = !fuera
     v.distanciaM = fuera ? a.entre(380, 1600) : a.entre(6, 110)
-    v.fotoSemilla = a.entre(1, 9999)
+    if (!esVen || primeraDelDia) v.fotoSemilla = a.entre(1, 9999)
+    if (!esVen) v.fotoExhibicionSemilla = a.entre(1, 9999)
     if (esVen) {
       const vende = a.r() < 0.78
+      const pedido = vende ? a.entre(4, 45) * 100_000 : 0
+      const gestion = a.r() < 0.08 ? 'Otros' : a.r() < 0.1 ? 'Capacitación' : v.tipo
       v.vendedora = {
-        gestion: v.tipo,
-        valorPedido: vende ? a.entre(4, 45) * 100_000 : 0,
-        recaudo: a.r() < 0.7 ? a.entre(2, 30) * 100_000 : 0,
+        gestion,
+        gestionOtro: gestion === 'Otros' ? a.uno(['Entrega de muestras al médico del punto', 'Actualización de datos del cliente', 'Revisión de fechas de vencimiento']) : undefined,
+        estimadoPedido: pedido,
+        unidadesPedido: pedido ? Math.round(pedido / a.entre(28_000, 42_000)) : 0,
+        estadoCartera: a.r() < 0.18 ? 'Vencida' : 'Al día',
+        faltantes: faltantes(0.3),
         motivoNoVenta: vende ? undefined : a.uno(L.motivosNoVenta),
         seguimiento: a.uno(['Se confirmó la entrega del pedido anterior', 'Compromiso de pago cumplido', 'Pendiente respuesta de compras', 'Sin compromisos anteriores']),
         novedades: a.uno(['Sin novedades', 'Solicitan material POP para la vitrina', 'Competencia con descuento del 20 % en colágeno', 'Cambio de administrador del punto']),
@@ -247,10 +281,11 @@ export function generarDatos(): DatosDemo {
     } else {
       v.impulsadora = {
         asistencia: true,
-        agotados: a.r() < 0.4 ? a.varios(L.productos, a.entre(1, 2)) : [],
+        faltantes: faltantes(0.4),
         unidades: a.entre(3, 38),
         exhibicion: a.uno(['Buena', 'Buena', 'Regular', 'Deficiente'] as const),
         pop: a.r() < 0.7,
+        popObservaciones: a.uno(['', '', '', 'El cliente no permite instalar habladores', 'Afiche entregado, pendiente instalar', 'Se retiró material de la competencia']),
         promociones: a.uno(['Sin promoción activa', 'Lleve 2 Magnesio con 15 % de descuento', 'Omega 3 + Vitamina C de obsequio']),
         actividades: a.varios(L.actividades, a.entre(1, 3)),
         competencia: a.uno(['Sin novedad', 'Marca competidora con impulsadora los fines de semana', 'Competencia bajó precio del colágeno', 'Nueva marca de magnesio en góndola']),
@@ -259,6 +294,20 @@ export function generarDatos(): DatosDemo {
       }
     }
   }
+
+  // Novedades registradas días después de cerrar la visita (devoluciones, cambios de pedido)
+  const conPedido = visitas.filter((v) => v.fecha < dias[4] && (v.vendedora?.estimadoPedido ?? 0) > 0)
+  const ejemplos = [
+    { motivo: 'Devolución de productos', detalle: 'Al recibir el pedido el cliente devolvió 6 unidades de Omega 3 por fecha de vencimiento corta.' },
+    { motivo: 'Cambio en el pedido', detalle: 'El cliente redujo el pedido: retiró 12 unidades de L-Carnitina antes del despacho.' },
+    { motivo: 'Reclamo del cliente', detalle: 'Llegaron 4 frascos de Magnesio con la tapa abollada; se gestiona el cambio.' },
+  ]
+  ejemplos.forEach((e, i) => {
+    const v = conPedido[i * 7]
+    if (!v) return
+    const autor = usuarios.find((u) => u.id === v.usuarioId)!.nombre
+    v.novedadesPosteriores.push({ id: `n-${i}`, fecha: dias[dias.indexOf(v.fecha) + 1], hora: `1${i}:2${i}`, autor, ...e })
+  })
 
   return { generadoPara: hoy, usuarios, puntos, visitas, listas: L }
 }

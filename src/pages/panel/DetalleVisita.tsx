@@ -1,8 +1,9 @@
-import { ArrowLeft, Clock, MapPin } from 'lucide-react'
-import type { ReactNode } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { ArrowLeft, Camera, Clock, MapPin, MapPinPlus, Plus } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Circle, CircleMarker, MapContainer, TileLayer, Tooltip } from 'react-leaflet'
 import { FotoVisita } from '../../components/FotoVisita'
+import { FormNovedad, ListaNovedades } from '../../components/Novedades'
 import { EstadoChip, FueraDeRango } from '../../components/ui'
 import { PERFIL_NOMBRE } from '../../data/types'
 import { capitalizar, fechaLarga, pesos } from '../../lib/fechas'
@@ -22,12 +23,19 @@ export function DetalleVisita() {
   const v = useDemo((s) => s.visitas.find((x) => x.id === id))
   const p = useDemo((s) => s.puntos.find((x) => x.id === v?.puntoId))
   const u = useDemo((s) => s.usuarios.find((x) => x.id === v?.usuarioId))
+  const sesion = useDemo((s) => s.usuarios.find((x) => x.id === s.sesion))
+  const visitas = useDemo((s) => s.visitas)
+  const [agregando, setAgregando] = useState(false)
 
   if (!v || !p || !u) return <p className="text-gris">No encontramos esta visita. Vuelve al seguimiento y elige otra.</p>
 
   // Posición registrada: desplazada desde el punto según la distancia guardada
   const d = v.distanciaM ?? 0
-  const registrada: [number, number] = [p.lat + (d / 111_000) * 0.6, p.lng + (d / 111_000) * 0.8]
+  const lat = p.lat ?? 3.43
+  const lng = p.lng ?? -76.52
+  const registrada: [number, number] = [lat + (d / 111_000) * 0.6, lng + (d / 111_000) * 0.8]
+  // Vendedoras: la foto del día está en la primera visita de su jornada
+  const fotoJornada = v.vendedora && !v.foto && !v.fotoSemilla ? visitas.find((x) => x.usuarioId === v.usuarioId && x.fecha === v.fecha && (x.foto || x.fotoSemilla)) : undefined
   const dur = minutos(v.llegada, v.salida)
 
   return (
@@ -40,7 +48,7 @@ export function DetalleVisita() {
         <div>
           <h1 className="text-2xl font-bold">{p.nombre}</h1>
           <p className="mt-1 text-gris">
-            {u.nombre}, {PERFIL_NOMBRE[u.perfil].toLowerCase()} · {p.zona} · {capitalizar(fechaLarga(v.fecha))}
+            {u.nombre}, {PERFIL_NOMBRE[u.perfil].toLowerCase()} · {p.codigo} · {p.direccion || 'Sin dirección registrada'} · {p.zona} · {capitalizar(fechaLarga(v.fecha))}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -51,8 +59,36 @@ export function DetalleVisita() {
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
         <div className="space-y-5">
-          {v.estado === 'realizada' ? (
-            <FotoVisita visita={v} punto={p} className="aspect-[4/3] w-full" />
+          {v.estado === 'realizada' && v.impulsadora ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <figure>
+                <FotoVisita visita={v} punto={p} className="aspect-[4/3] w-full" />
+                <figcaption className="mt-1.5 text-sm text-gris">Llegada al almacén</figcaption>
+              </figure>
+              <figure>
+                <FotoVisita visita={v} punto={p} tipo="exhibicion" className="aspect-[4/3] w-full" />
+                <figcaption className="mt-1.5 text-sm text-gris">Exhibición de productos Natural Systems</figcaption>
+              </figure>
+            </div>
+          ) : v.estado === 'realizada' && (v.foto || v.fotoSemilla) ? (
+            <figure>
+              <FotoVisita visita={v} punto={p} className="aspect-[4/3] w-full" />
+              <figcaption className="mt-1.5 text-sm text-gris">Foto de inicio de jornada de {u.nombre}</figcaption>
+            </figure>
+          ) : v.estado === 'realizada' ? (
+            <div className="flex items-start gap-3 rounded-xl border border-dashed border-linea bg-white p-5 text-sm text-gris">
+              <Camera size={18} className="mt-0.5 shrink-0" aria-hidden />
+              <span>
+                Las vendedoras toman una sola foto al inicio de la jornada.{' '}
+                {fotoJornada ? (
+                  <Link to={`/panel/visita/${fotoJornada.id}`} className="font-medium text-cobalto hover:underline">
+                    Ver la foto de este día ({fotoJornada.llegada})
+                  </Link>
+                ) : (
+                  'Este día no tiene foto registrada.'
+                )}
+              </span>
+            </div>
           ) : (
             <div className="flex aspect-[4/3] items-center justify-center rounded-xl border border-dashed border-linea bg-white p-8 text-center text-gris">
               {v.estado === 'no_realizada' && `No se realizó: ${v.motivoNoRealizacion}`}
@@ -69,8 +105,12 @@ export function DetalleVisita() {
                 <Dato etiqueta="Duración" valor={dur !== null ? `${dur} min` : '—'} />
               </dl>
               <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-                <MapPin size={15} className="text-gris" aria-hidden />
-                {v.enRango ? (
+                {v.ubicacionTomada ? <MapPinPlus size={15} className="text-cobalto" aria-hidden /> : <MapPin size={15} className="text-gris" aria-hidden />}
+                {v.ubicacionTomada ? (
+                  <span>
+                    El cliente no tenía dirección ni ubicación. Esta visita registró su ubicación (<span className="tabular">{lat.toFixed(5)}, {lng.toFixed(5)}</span>), que queda como referencia del punto.
+                  </span>
+                ) : v.enRango ? (
                   <span>
                     Registrada a <strong className="tabular">{d} m</strong> del punto, dentro del rango de {RANGO_M} m.
                   </span>
@@ -82,15 +122,15 @@ export function DetalleVisita() {
                 )}
               </div>
               <div className="mt-4 h-56 overflow-hidden rounded-xl">
-                <MapContainer center={[p.lat, p.lng]} zoom={d > 400 ? 14 : 17} scrollWheelZoom={false} className="h-full w-full">
+                <MapContainer center={[lat, lng]} zoom={d > 400 ? 14 : 17} scrollWheelZoom={false} className="h-full w-full">
                   <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                  <Circle center={[p.lat, p.lng]} radius={RANGO_M} pathOptions={{ color: '#1546a0', weight: 1, fillOpacity: 0.08 }} />
-                  <CircleMarker center={[p.lat, p.lng]} radius={6} pathOptions={{ color: '#fff', weight: 2, fillColor: '#1546a0', fillOpacity: 1 }}>
+                  <Circle center={[lat, lng]} radius={RANGO_M} pathOptions={{ color: '#1546a0', weight: 1, fillOpacity: 0.08 }} />
+                  <CircleMarker center={[lat, lng]} radius={6} pathOptions={{ color: '#fff', weight: 2, fillColor: '#1546a0', fillOpacity: 1 }}>
                     <Tooltip permanent direction="top">Punto de venta</Tooltip>
                   </CircleMarker>
-                  <CircleMarker center={registrada} radius={6} pathOptions={{ color: '#fff', weight: 2, fillColor: v.enRango ? '#2f8a43' : '#c0392b', fillOpacity: 1 }}>
+                  {!v.ubicacionTomada && <CircleMarker center={registrada} radius={6} pathOptions={{ color: '#fff', weight: 2, fillColor: v.enRango ? '#2f8a43' : '#c0392b', fillOpacity: 1 }}>
                     <Tooltip permanent direction="bottom">Registro</Tooltip>
-                  </CircleMarker>
+                  </CircleMarker>}
                 </MapContainer>
               </div>
             </Tarjeta>
@@ -115,10 +155,12 @@ export function DetalleVisita() {
           {v.vendedora && (
             <Tarjeta titulo="Gestión comercial">
               <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
-                <Dato etiqueta="Gestión realizada" valor={v.vendedora.gestion} />
-                <Dato etiqueta="Valor del pedido" valor={v.vendedora.valorPedido ? pesos(v.vendedora.valorPedido) : 'Sin pedido'} />
-                <Dato etiqueta="Recaudo" valor={v.vendedora.recaudo ? pesos(v.vendedora.recaudo) : 'Sin recaudo'} />
-                {v.vendedora.motivoNoVenta && <Dato etiqueta="Motivo de no venta" valor={v.vendedora.motivoNoVenta} />}
+                <Dato etiqueta="Gestión realizada" valor={v.vendedora.gestion === 'Otros' ? `Otros: ${v.vendedora.gestionOtro ?? ''}` : v.vendedora.gestion} ancho={v.vendedora.gestion === 'Otros'} />
+                <Dato etiqueta="Estado de cartera" valor={v.vendedora.estadoCartera} alerta={v.vendedora.estadoCartera === 'Vencida'} />
+                <Dato etiqueta="Estimado de pedido" valor={v.vendedora.estimadoPedido ? pesos(v.vendedora.estimadoPedido) : 'Sin pedido'} />
+                <Dato etiqueta="Unidades del pedido" valor={`${v.vendedora.unidadesPedido}`} />
+                {v.vendedora.motivoNoVenta && <Dato etiqueta="Motivo de no venta" valor={v.vendedora.motivoNoVenta} ancho />}
+                <Faltantes lista={v.vendedora.faltantes} />
                 <Dato etiqueta="Seguimiento a compromisos" valor={v.vendedora.seguimiento} ancho />
                 <Dato etiqueta="Novedades" valor={v.vendedora.novedades} ancho />
                 <Dato
@@ -135,14 +177,31 @@ export function DetalleVisita() {
               <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
                 <Dato etiqueta="Unidades vendidas" valor={`${v.impulsadora.unidades}`} />
                 <Dato etiqueta="Exhibición" valor={v.impulsadora.exhibicion} />
-                <Dato etiqueta="Productos agotados" valor={v.impulsadora.agotados.length ? v.impulsadora.agotados.join(', ') : 'Ninguno'} ancho />
+                <Faltantes lista={v.impulsadora.faltantes} />
                 <Dato etiqueta="Material POP" valor={v.impulsadora.pop ? 'Instalado' : 'No hay'} />
+                {v.impulsadora.popObservaciones && <Dato etiqueta="Observaciones POP" valor={v.impulsadora.popObservaciones} ancho />}
                 <Dato etiqueta="Promociones" valor={v.impulsadora.promociones} />
                 <Dato etiqueta="Actividades" valor={v.impulsadora.actividades.join(', ')} ancho />
                 <Dato etiqueta="Competencia observada" valor={v.impulsadora.competencia} ancho />
                 <Dato etiqueta="Oportunidades" valor={v.impulsadora.oportunidades} ancho />
                 <Dato etiqueta="Novedades" valor={v.impulsadora.novedades} ancho />
               </dl>
+            </Tarjeta>
+          )}
+
+          {v.estado === 'realizada' && (
+            <Tarjeta
+              titulo="Novedades después del cierre"
+              accion={
+                !agregando && (
+                  <button onClick={() => setAgregando(true)} className="flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-semibold text-cobalto hover:bg-cobalto-50">
+                    <Plus size={15} aria-hidden /> Agregar novedad
+                  </button>
+                )
+              }
+            >
+              {agregando ? <FormNovedad visitaId={v.id} autor={sesion?.nombre ?? 'Panel'} onListo={() => setAgregando(false)} /> : <ListaNovedades novedades={v.novedadesPosteriores} />}
+              {!agregando && v.novedadesPosteriores.length > 0 && <p className="mt-3 text-xs text-gris">El registro original de la visita se conserva sin cambios.</p>}
             </Tarjeta>
           )}
 
@@ -159,20 +218,44 @@ export function DetalleVisita() {
   )
 }
 
-function Tarjeta({ titulo, children }: { titulo: string; children: ReactNode }) {
+function Tarjeta({ titulo, children, accion }: { titulo: string; children: ReactNode; accion?: ReactNode }) {
   return (
     <section className="rounded-2xl border border-linea bg-white p-5">
-      <h2 className="mb-4 font-semibold">{titulo}</h2>
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <h2 className="font-semibold">{titulo}</h2>
+        {accion}
+      </div>
       {children}
     </section>
   )
 }
 
-function Dato({ etiqueta, valor, icono, ancho }: { etiqueta: string; valor?: string; icono?: ReactNode; ancho?: boolean }) {
+function Faltantes({ lista }: { lista: { producto: string; cantidad: number }[] }) {
+  return (
+    <div className="col-span-2">
+      <dt className="text-xs text-gris">Faltantes de producto</dt>
+      <dd className="mt-1">
+        {lista.length === 0 ? (
+          <span className="text-[15px] font-medium">Ninguno</span>
+        ) : (
+          <ul className="flex flex-wrap gap-1.5">
+            {lista.map((f) => (
+              <li key={f.producto} className="rounded-lg bg-alerta-50 px-2.5 py-1 text-sm text-alerta">
+                {f.producto} <strong className="tabular">{f.cantidad} und.</strong>
+              </li>
+            ))}
+          </ul>
+        )}
+      </dd>
+    </div>
+  )
+}
+
+function Dato({ etiqueta, valor, icono, ancho, alerta }: { etiqueta: string; valor?: string; icono?: ReactNode; ancho?: boolean; alerta?: boolean }) {
   return (
     <div className={ancho ? 'col-span-2' : ''}>
       <dt className="text-xs text-gris">{etiqueta}</dt>
-      <dd className="mt-0.5 flex items-center gap-1.5 text-[15px] font-medium tabular">
+      <dd className={`mt-0.5 flex items-center gap-1.5 text-[15px] font-medium tabular ${alerta ? 'text-alerta' : ''}`}>
         {icono}
         {valor ?? '—'}
       </dd>

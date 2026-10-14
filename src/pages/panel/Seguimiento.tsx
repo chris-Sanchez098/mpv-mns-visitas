@@ -1,4 +1,4 @@
-import { AlertTriangle, CalendarX2, Download, MapPinOff, PackageX, RefreshCw } from 'lucide-react'
+import { AlertTriangle, CalendarX2, Download, MapPinOff, MessageSquarePlus, PackageX, RefreshCw, Wallet } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -7,7 +7,7 @@ import { claseSelect, FueraDeRango } from '../../components/ui'
 import { FotoVisita } from '../../components/FotoVisita'
 import { ESTADO_NOMBRE, PERFIL_NOMBRE, type Estado, type Visita } from '../../data/types'
 import { capitalizar, diasHabiles, fechaCorta, fechaLarga, hoyDemo, pesos, pesosCortos } from '../../lib/fechas'
-import { filtrar, indicadores, META_CUMPLIMIENTO, porc, type Filtros } from '../../lib/metricas'
+import { faltantesDe, filtrar, indicadores, META_CUMPLIMIENTO, porc, resumenActividades, resumenFaltantes, type Filtros } from '../../lib/metricas'
 import { exportarVisitas } from '../../lib/excel'
 import { useDemo } from '../../store'
 import { GraficosSeguimiento } from './GraficosSeguimiento'
@@ -59,7 +59,26 @@ export function Seguimiento() {
 
   const bajos = porPersona.filter((p) => p.k.programadas - p.k.porVisitar > 0 && p.k.cumplimiento < META_CUMPLIMIENTO)
   const fuera = vs.filter((v) => v.enRango === false)
-  const conAgotados = vs.filter((v) => (v.impulsadora?.agotados.length ?? 0) > 0)
+  const conFaltantes = vs.filter((v) => v.estado === 'realizada' && faltantesDe(v).length > 0)
+  const faltantesTop = useMemo(() => resumenFaltantes(vs), [vs])
+  const actividades = useMemo(() => resumenActividades(vs), [vs])
+  // Último estado de cartera reportado por cliente en el periodo
+  const carteraVencida = useMemo(() => {
+    const m = new Map<string, Visita>()
+    vs.filter((v) => v.vendedora).forEach((v) => {
+      const prev = m.get(v.puntoId)
+      if (!prev || `${v.fecha}${v.llegada}` > `${prev.fecha}${prev.llegada}`) m.set(v.puntoId, v)
+    })
+    return [...m.values()].filter((v) => v.vendedora!.estadoCartera === 'Vencida')
+  }, [vs])
+  // Novedades registradas después del cierre en los últimos 6 días
+  const novedades = useMemo(() => {
+    const seis = diasHabiles(hoy, 6)
+    return visitas
+      .filter((v) => (!zona || zonaDe.get(v.puntoId) === zona) && (!usuarioId || v.usuarioId === usuarioId) && (!perfil || usuarioDe.get(v.usuarioId)?.perfil === perfil))
+      .flatMap((v) => v.novedadesPosteriores.filter((n) => seis.includes(n.fecha)).map((n) => ({ n, v })))
+      .sort((a, b) => `${b.n.fecha}${b.n.hora}`.localeCompare(`${a.n.fecha}${a.n.hora}`))
+  }, [visitas, zona, usuarioId, perfil, zonaDe, usuarioDe, hoy])
   const compromisos = useMemo(
     () =>
       visitas
@@ -81,7 +100,7 @@ export function Seguimiento() {
   }, [vs])
 
   const recientes = useMemo(
-    () => vs.filter((v) => v.estado === 'realizada').sort((a, b) => `${b.fecha}${b.salida}`.localeCompare(`${a.fecha}${a.salida}`)).slice(0, 8),
+    () => vs.filter((v) => v.estado === 'realizada' && (v.foto || v.fotoSemilla || v.fotoExhibicion || v.fotoExhibicionSemilla)).sort((a, b) => `${b.fecha}${b.salida}`.localeCompare(`${a.fecha}${a.salida}`)).slice(0, 8),
     [vs],
   )
 
@@ -204,14 +223,21 @@ export function Seguimiento() {
         {verPerfil('vendedora') && (
           <div className="rounded-2xl border border-linea bg-white p-5">
             <h2 className="font-semibold">Resultado de las vendedoras</h2>
-            <dl className="mt-4 grid grid-cols-3 gap-4">
+            <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
               <div>
-                <dt className="text-sm text-gris">Pedidos</dt>
+                <dt className="text-sm text-gris">Pedidos estimados</dt>
                 <dd className="mt-1 text-2xl font-bold tabular">{pesosCortos(k.pedidos)}</dd>
               </div>
               <div>
-                <dt className="text-sm text-gris">Recaudo</dt>
-                <dd className="mt-1 text-2xl font-bold tabular">{pesosCortos(k.recaudo)}</dd>
+                <dt className="text-sm text-gris">Unidades del pedido</dt>
+                <dd className="mt-1 text-2xl font-bold tabular">{k.unidadesPedido.toLocaleString('es-CO')}</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-gris">Cartera vencida</dt>
+                <dd className={`mt-1 text-2xl font-bold tabular ${k.carteraVencida ? 'text-alerta' : ''}`}>
+                  {k.carteraVencida}
+                  <span className="ml-1 text-sm font-medium text-gris">de {k.clientesVisitados} clientes</span>
+                </dd>
               </div>
               <div>
                 <dt className="text-sm text-gris">Visitas con venta</dt>
@@ -229,8 +255,8 @@ export function Seguimiento() {
                 <dd className="mt-1 text-2xl font-bold tabular">{k.unidades.toLocaleString('es-CO')}</dd>
               </div>
               <div>
-                <dt className="text-sm text-gris">Agotados reportados</dt>
-                <dd className="mt-1 text-2xl font-bold tabular">{k.agotados}</dd>
+                <dt className="text-sm text-gris">Faltantes reportados</dt>
+                <dd className="mt-1 text-2xl font-bold tabular">{indicadores(vs.filter((v) => v.impulsadora)).faltantes}</dd>
               </div>
               <div>
                 <dt className="text-sm text-gris">Exhibición deficiente</dt>
@@ -300,7 +326,86 @@ export function Seguimiento() {
             <Desviacion Icono={AlertTriangle} n={bajos.length} titulo="Personas bajo la meta de cumplimiento" detalle={bajos.slice(0, 3).map((b) => `${b.u.nombre} (${porc(b.k.cumplimiento)})`).join(', ')} />
             <Desviacion Icono={MapPinOff} n={fuera.length} titulo="Visitas registradas fuera del rango del punto" detalle={fuera.slice(0, 2).map((v) => `${usuarioDe.get(v.usuarioId)?.nombre} en ${puntoDe.get(v.puntoId)?.nombre}`).join(', ')} enlace={fuera[0] && `/panel/visita/${fuera[0].id}`} />
             <Desviacion Icono={CalendarX2} n={vencidos.length} titulo="Compromisos de vendedoras vencidos" detalle={vencidos.slice(0, 2).map((v) => `${v.vendedora!.proximaAccion} · ${puntoDe.get(v.puntoId)?.nombre}`).join(', ')} />
-            <Desviacion Icono={PackageX} n={conAgotados.length} titulo="Puntos con productos agotados" detalle={[...new Set(conAgotados.flatMap((v) => v.impulsadora!.agotados))].slice(0, 4).join(', ')} />
+            <Desviacion Icono={PackageX} n={new Set(conFaltantes.map((v) => v.puntoId)).size} titulo="Puntos con faltantes de producto" detalle={faltantesTop.slice(0, 4).map((f) => f.producto).join(', ')} />
+            <Desviacion Icono={Wallet} n={carteraVencida.length} titulo="Clientes visitados con cartera vencida" detalle={carteraVencida.slice(0, 3).map((v) => puntoDe.get(v.puntoId)?.nombre).join(', ')} enlace={carteraVencida[0] && `/panel/visita/${carteraVencida[0].id}`} />
+          </ul>
+        </div>
+      </section>
+
+      {/* Gestión registrada en campo */}
+      <section className="grid gap-4 lg:grid-cols-3">
+        <div className="rounded-2xl border border-linea bg-white p-5">
+          <h2 className="font-semibold">Actividades y gestiones realizadas</h2>
+          <p className="mt-0.5 text-sm text-gris">Veces que se registró cada una en el periodo</p>
+          <ul className="mt-4 space-y-2.5">
+            {actividades.slice(0, 8).map((a) => (
+              <li key={a.nombre}>
+                <div className="flex items-baseline justify-between text-sm">
+                  <span>{a.nombre}</span>
+                  <span className="font-semibold tabular">{a.n}</span>
+                </div>
+                <div className="mt-1 h-2 overflow-hidden rounded-full bg-niebla">
+                  <div className="h-full rounded-full bg-cobalto" style={{ width: `${(a.n / actividades[0].n) * 100}%` }} />
+                </div>
+              </li>
+            ))}
+            {actividades.length === 0 && <li className="text-sm text-gris">Aún no hay visitas registradas en el periodo.</li>}
+          </ul>
+        </div>
+
+        <div className="rounded-2xl border border-linea bg-white p-5">
+          <h2 className="font-semibold">Faltantes de producto</h2>
+          <p className="mt-0.5 text-sm text-gris">Referencias reportadas por vendedoras e impulsadoras</p>
+          <table className="mt-3 w-full text-sm">
+            <thead className="text-left text-xs text-gris">
+              <tr>
+                <th className="py-1.5 font-medium">Referencia</th>
+                <th className="py-1.5 text-right font-medium">Unidades</th>
+                <th className="py-1.5 text-right font-medium">Puntos</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-linea">
+              {faltantesTop.slice(0, 8).map((f) => (
+                <tr key={f.producto}>
+                  <td className="py-2">{f.producto}</td>
+                  <td className="py-2 text-right font-semibold tabular">{f.cantidad}</td>
+                  <td className="py-2 text-right tabular text-gris">{f.puntos}</td>
+                </tr>
+              ))}
+              {faltantesTop.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="py-4 text-gris">
+                    Sin faltantes reportados en el periodo.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="rounded-2xl border border-linea bg-white p-5">
+          <h2 className="font-semibold">Estado de cartera de clientes visitados</h2>
+          <p className="mt-0.5 text-sm text-gris">Último estado reportado por las vendedoras</p>
+          <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-hoja" aria-hidden>
+            <div className="bg-alerta" style={{ width: `${(carteraVencida.length / Math.max(1, k.clientesVisitados)) * 100}%` }} />
+          </div>
+          <div className="mt-2 flex justify-between text-sm">
+            <span>
+              <strong className="text-alerta tabular">{carteraVencida.length}</strong> vencida
+            </span>
+            <span>
+              <strong className="text-hoja tabular">{Math.max(0, k.clientesVisitados - carteraVencida.length)}</strong> al día
+            </span>
+          </div>
+          <ul className="mt-3 divide-y divide-linea">
+            {carteraVencida.slice(0, 5).map((v) => (
+              <li key={v.id}>
+                <Link to={`/panel/visita/${v.id}`} className="flex items-baseline justify-between gap-2 py-2 text-sm hover:text-cobalto">
+                  <span className="truncate">{puntoDe.get(v.puntoId)?.nombre}</span>
+                  <span className="shrink-0 text-xs text-gris">{usuarioDe.get(v.usuarioId)?.nombre.split(' ')[0]}</span>
+                </Link>
+              </li>
+            ))}
           </ul>
         </div>
       </section>
@@ -315,6 +420,7 @@ export function Seguimiento() {
               <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               {ultimoEstadoPorPunto.map((v) => {
                 const p = puntoDe.get(v.puntoId)!
+                if (p.lat === undefined || p.lng === undefined) return null
                 return (
                   <CircleMarker
                     key={v.puntoId}
@@ -360,14 +466,15 @@ export function Seguimiento() {
       {/* Evidencia y compromisos */}
       <section className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="rounded-2xl border border-linea bg-white p-5">
-          <h2 className="font-semibold">Últimas visitas registradas</h2>
+          <h2 className="font-semibold">Evidencias fotográficas registradas</h2>
+          <p className="mt-0.5 text-sm text-gris">Impulsadoras: exhibición del almacén. Vendedoras: foto de inicio de jornada.</p>
           <ul className="mt-4 grid gap-3 sm:grid-cols-2">
             {recientes.map((v) => {
               const p = puntoDe.get(v.puntoId)
               return (
                 <li key={v.id}>
                   <Link to={`/panel/visita/${v.id}`} className="flex gap-3 rounded-xl border border-linea p-2.5 hover:border-cobalto">
-                    <FotoVisita visita={v} punto={p} compacta className="h-20 w-24 shrink-0" />
+                    <FotoVisita visita={v} punto={p} tipo={v.impulsadora ? 'exhibicion' : 'presencia'} compacta className="h-20 w-24 shrink-0" />
                     <div className="min-w-0 text-sm">
                       <div className="truncate font-semibold">{p?.nombre}</div>
                       <div className="truncate text-gris">{usuarioDe.get(v.usuarioId)?.nombre}</div>
@@ -384,10 +491,34 @@ export function Seguimiento() {
           </ul>
         </div>
 
+        <div className="space-y-4">
+        <div className="rounded-2xl border border-linea bg-white p-5">
+          <h2 className="flex items-center gap-2 font-semibold">
+            <MessageSquarePlus size={17} className="text-ambar" aria-hidden /> Novedades después del cierre
+          </h2>
+          <p className="mt-0.5 text-sm text-gris">Devoluciones y cambios registrados sobre visitas ya cerradas, últimos 6 días</p>
+          <ul className="mt-3 divide-y divide-linea">
+            {novedades.slice(0, 4).map(({ n, v }) => (
+              <li key={n.id}>
+                <Link to={`/panel/visita/${v.id}`} className="block py-2.5 hover:text-cobalto">
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="text-sm font-semibold">{n.motivo}</span>
+                    <span className="shrink-0 text-xs text-gris">{fechaCorta(n.fecha)}</span>
+                  </span>
+                  <span className="mt-0.5 line-clamp-2 block text-sm">{n.detalle}</span>
+                  <span className="mt-0.5 block truncate text-xs text-gris">
+                    {puntoDe.get(v.puntoId)?.nombre} · visita del {fechaCorta(v.fecha)} · {n.autor}
+                  </span>
+                </Link>
+              </li>
+            ))}
+            {novedades.length === 0 && <li className="py-3 text-sm text-gris">Sin novedades registradas.</li>}
+          </ul>
+        </div>
         <div className="rounded-2xl border border-linea bg-white p-5">
           <h2 className="font-semibold">Compromisos y próximas acciones</h2>
           <ul className="mt-3 divide-y divide-linea">
-            {compromisos.slice(0, 7).map((v) => {
+            {compromisos.slice(0, 5).map((v) => {
               const vencido = v.vendedora!.fechaCompromiso! < hoy
               return (
                 <li key={v.id}>
@@ -408,8 +539,9 @@ export function Seguimiento() {
             })}
           </ul>
           <p className="mt-3 text-xs text-gris">
-            {compromisos.length} compromisos abiertos · {vencidos.length} vencidos · Pedidos de la semana: {pesos(indicadores(filtrar(visitas, usuarios, zonaDe, { dias: diasHabiles(hoy, 6), zona, perfil: 'vendedora', usuarioId })).pedidos)}
+            {compromisos.length} compromisos abiertos · {vencidos.length} vencidos · Pedidos estimados de la semana: {pesos(indicadores(filtrar(visitas, usuarios, zonaDe, { dias: diasHabiles(hoy, 6), zona, perfil: 'vendedora', usuarioId })).pedidos)}
           </p>
+        </div>
         </div>
       </section>
     </div>

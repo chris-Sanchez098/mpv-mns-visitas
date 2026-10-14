@@ -6,21 +6,22 @@ Prototipo navegable de la herramienta de **planificación y seguimiento de visit
 
 | Propuesta | En el prototipo |
 | --- | --- |
-| Módulo de Administración | Usuarios por perfil, puntos de venta con ubicación, listas configurables, descarga de la plantilla de carga inicial (Excel real). |
-| Módulo de Planificación | Plan por persona y día con orden, franja, tipo, objetivo e impacto; estados; copiar el plan de hoy; publicar; reprogramar con historial. |
-| Módulo de Registro en Campo | Ruta del día, llegada con validación de ubicación (simulada), **foto con la cámara real del dispositivo**, formularios de impulsadora y vendedora, motivo de no realización, visitas no programadas, **modo sin conexión con sincronización**. |
-| Módulo de Seguimiento | Cumplimiento de ruta frente a la meta, planificado vs. ejecutado, gestión adicional, resultados por perfil, ruta de cada persona, desviaciones, mapa, cumplimiento por zona, evidencia de cada visita, compromisos, filtros y **exportación a Excel (real)**. |
+| Módulo de Administración | Usuarios por perfil, clientes con código, clientes sin dirección, listas configurables y **carga de clientes desde Excel** sin duplicados (el código es la llave). |
+| Módulo de Planificación | Plan por persona y día con orden, franja, tipo, objetivo e impacto; estados; copiar el plan de hoy; publicar; reprogramar con historial; **carga de la programación desde Excel** (persona + cliente + fecha es la llave). |
+| Módulo de Registro en Campo | Llegada con hora y ubicación validada; clientes sin dirección toman su ubicación en la primera visita; **vendedoras: una foto al inicio de la jornada**; **impulsadoras: foto del almacén y foto de la exhibición**; formularios con estimado de pedido, unidades, estado de cartera, faltantes con cantidades, gestión "Otros", observaciones de POP y la actividad Capacitación; **novedades posteriores al cierre**; modo sin conexión. |
+| Módulo de Seguimiento | Resumen del Director Comercial: programadas y ejecutadas, gráficos, actividades y gestiones, evidencias fotográficas, pedidos estimados y unidades, faltantes, estado de cartera, novedades posteriores, desviaciones, mapa, detalle de cada visita y **exportación a Excel**. |
 
 No muestra nada de lo que está en exclusiones (integraciones, alertas por otros medios, optimización de rutas).
 
-## Guion de la demo (5 minutos)
+## Guion de la demo (7 minutos)
 
-1. **Ingreso:** explica que hay un perfil por rol. Entra como **Dirección Comercial** y muestra el cumplimiento de hoy, las desviaciones y la ruta de cada persona (cada cápsula es una visita; clic para ver la evidencia).
-2. **Planificación:** entra a *Planificación*, elige *Mañana*, pulsa **Copiar el plan de hoy** y luego **Publicar plan**. Reprograma una visita para mostrar el historial.
-3. **Campo (impulsadora):** pulsa *Ver app de campo*. Abre la primera visita: **Registrar llegada** → validación de ubicación → **Tomar foto** (cámara real) → formulario → **Registrar salida**.
-4. **Sin conexión:** activa *Sin conexión* en la parte superior, registra otra visita y muestra que queda guardada en el dispositivo. Vuelve a *En línea* y se sincroniza.
-5. **El momento clave:** pulsa **Ver el panel de Dirección Comercial**. Las visitas que acabas de registrar ya suman en el indicador, aparecen en *Últimas visitas registradas* con su foto y en el mapa.
-6. Cierra con **Exportar a Excel**.
+1. **Ingreso:** hay un perfil por rol. Entra como **Dirección Comercial** (Edison Muñoz) y muestra el cumplimiento, los gráficos y la sección de gestión: actividades, faltantes, cartera y novedades.
+2. **Carga por Excel:** en *Administración → Clientes* pulsa **Cargar desde Excel → Probar con un archivo de ejemplo**: se ven los clientes nuevos, los que se actualizan por código y las filas con error. Repite en *Planificación* con **Cargar programación desde Excel** y publica el plan.
+3. **Campo (impulsadora):** *Ver app de campo*. Primera visita: llegada → **foto del almacén** → **foto de la exhibición** → faltantes con cantidades, observaciones de POP, Capacitación → salida. La segunda visita es a un **cliente sin dirección**: al registrar la llegada, su ubicación queda guardada.
+4. **Campo (vendedora):** cambia a *vendedora*. En la primera visita se pide la **foto de inicio de jornada**; en la segunda ya no. Muestra estimado de pedido, unidades, estado de cartera y la gestión *Otros*.
+5. **Novedad posterior:** *Visitas anteriores y novedades* → abre una visita cerrada → **Agregar** una devolución. El registro original no cambia.
+6. **Sin conexión:** activa *Sin conexión*, registra una visita y vuelve a *En línea* para sincronizar.
+7. **El momento clave:** pulsa **Ver el panel de Dirección Comercial**. Todo lo registrado ya está en el resumen y en el detalle de cada visita. Cierra con **Exportar a Excel**.
 
 *Reiniciar demo* (barra superior) deja todo como al inicio para la siguiente presentación. Si la demo se abre otro día, los datos se regeneran solos para que siempre haya ruta “hoy”.
 
