@@ -18,7 +18,7 @@ export function CampoLayout() {
         {/* En computador se muestra dentro de un marco de teléfono; en el dispositivo móvil ocupa toda la pantalla */}
         <div className="flex w-full flex-col bg-niebla md:h-[820px] md:w-[400px] md:overflow-hidden md:rounded-[44px] md:border-[10px] md:border-tinta md:shadow-2xl">
           <EncabezadoApp nombre={usuario?.nombre ?? ''} perfil={usuario ? PERFIL_NOMBRE[usuario.perfil] : ''} />
-          <div className="flex-1 overflow-y-auto">
+          <div id="campo-scroll" className="flex-1 overflow-y-auto">
             <Outlet />
           </div>
         </div>

@@ -1,5 +1,5 @@
-import { AlertTriangle, CalendarX2, Download, MapPinOff, MessageSquarePlus, PackageX, RefreshCw, Wallet } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { ChevronRight, AlertTriangle, CalendarX2, Download, MapPinOff, MessageSquarePlus, PackageX, RefreshCw, Wallet } from 'lucide-react'
+import { Fragment, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { CircleMarker, MapContainer, TileLayer, Tooltip as MapTip } from 'react-leaflet'
@@ -61,6 +61,17 @@ export function Seguimiento() {
   const fuera = vs.filter((v) => v.enRango === false)
   const conFaltantes = vs.filter((v) => v.estado === 'realizada' && faltantesDe(v).length > 0)
   const faltantesTop = useMemo(() => resumenFaltantes(vs), [vs])
+  const [abierto, setAbierto] = useState<string | null>(null)
+  // Impulsadoras que hoy registraron llegada y aún no cierran su jornada
+  const enJornada = visitas.filter(
+    (v) => v.fecha === hoy && v.estado === 'programada' && v.llegada && usuarioDe.get(v.usuarioId)?.perfil === 'impulsadora' && (!zona || zonaDe.get(v.puntoId) === zona),
+  ).length
+  // Dónde se reportó cada referencia faltante, del reporte más reciente al más antiguo
+  const dondeFalta = (producto: string) =>
+    vs
+      .filter((v) => v.estado === 'realizada')
+      .flatMap((v) => faltantesDe(v).filter((f) => f.producto === producto).map((f) => ({ v, cantidad: f.cantidad })))
+      .sort((a, b) => `${b.v.fecha}${b.v.salida}`.localeCompare(`${a.v.fecha}${a.v.salida}`))
   const actividades = useMemo(() => resumenActividades(vs), [vs])
   // Último estado de cartera reportado por cliente en el periodo
   const carteraVencida = useMemo(() => {
@@ -249,7 +260,14 @@ export function Seguimiento() {
         {verPerfil('impulsadora') && (
           <div className="rounded-2xl border border-linea bg-white p-5">
             <h2 className="font-semibold">Ejecución de las impulsadoras</h2>
-            <dl className="mt-4 grid grid-cols-3 gap-4">
+            <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <div>
+                <dt className="text-sm text-gris">En jornada ahora</dt>
+                <dd className="mt-1 text-2xl font-bold tabular">
+                  {enJornada}
+                  <span className="ml-1 text-sm font-medium text-gris">en almacén</span>
+                </dd>
+              </div>
               <div>
                 <dt className="text-sm text-gris">Unidades vendidas</dt>
                 <dd className="mt-1 text-2xl font-bold tabular">{k.unidades.toLocaleString('es-CO')}</dd>
@@ -355,7 +373,7 @@ export function Seguimiento() {
 
         <div className="rounded-2xl border border-linea bg-white p-5">
           <h2 className="font-semibold">Faltantes de producto</h2>
-          <p className="mt-0.5 text-sm text-gris">Referencias reportadas por vendedoras e impulsadoras</p>
+          <p className="mt-0.5 text-sm text-gris">Pulsa una referencia para ver en qué puntos falta</p>
           <table className="mt-3 w-full text-sm">
             <thead className="text-left text-xs text-gris">
               <tr>
@@ -366,11 +384,46 @@ export function Seguimiento() {
             </thead>
             <tbody className="divide-y divide-linea">
               {faltantesTop.slice(0, 8).map((f) => (
-                <tr key={f.producto}>
-                  <td className="py-2">{f.producto}</td>
-                  <td className="py-2 text-right font-semibold tabular">{f.cantidad}</td>
-                  <td className="py-2 text-right tabular text-gris">{f.puntos}</td>
-                </tr>
+                <Fragment key={f.producto}>
+                  <tr>
+                    <td className="py-2">
+                      <button
+                        onClick={() => setAbierto(abierto === f.producto ? null : f.producto)}
+                        aria-expanded={abierto === f.producto}
+                        className="flex items-center gap-1 text-left font-medium hover:text-cobalto"
+                      >
+                        <ChevronRight size={14} className={`shrink-0 text-gris transition-transform ${abierto === f.producto ? 'rotate-90' : ''}`} aria-hidden />
+                        {f.producto}
+                      </button>
+                    </td>
+                    <td className="py-2 text-right font-semibold tabular">{f.cantidad}</td>
+                    <td className="py-2 text-right tabular text-gris">{f.puntos}</td>
+                  </tr>
+                  {abierto === f.producto && (
+                    <tr>
+                      <td colSpan={3} className="pb-3">
+                        <ul className="max-h-64 space-y-1 overflow-y-auto rounded-xl bg-niebla p-2">
+                          {dondeFalta(f.producto).map(({ v, cantidad }) => {
+                            const u = usuarioDe.get(v.usuarioId)
+                            return (
+                              <li key={v.id}>
+                                <Link to={`/panel/visita/${v.id}`} className="flex items-baseline justify-between gap-2 rounded-lg bg-white px-2.5 py-1.5 hover:text-cobalto">
+                                  <span className="min-w-0">
+                                    <span className="block truncate font-medium">{puntoDe.get(v.puntoId)?.nombre}</span>
+                                    <span className="block truncate text-xs text-gris">
+                                      {puntoDe.get(v.puntoId)?.zona} · {u?.nombre.split(' ')[0]} ({u?.perfil === 'impulsadora' ? 'impulsadora' : 'vendedora'}) · {fechaCorta(v.fecha)}
+                                    </span>
+                                  </span>
+                                  <span className="shrink-0 font-semibold tabular">{cantidad} und.</span>
+                                </Link>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
               {faltantesTop.length === 0 && (
                 <tr>

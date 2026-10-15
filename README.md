@@ -8,16 +8,16 @@ Prototipo navegable de la herramienta de **planificación y seguimiento de visit
 | --- | --- |
 | Módulo de Administración | Usuarios por perfil, clientes con código, clientes sin dirección, listas configurables y **carga de clientes desde Excel** sin duplicados (el código es la llave). |
 | Módulo de Planificación | Plan por persona y día con orden, franja, tipo, objetivo e impacto; estados; copiar el plan de hoy; publicar; reprogramar con historial; **carga de la programación desde Excel** (persona + cliente + fecha es la llave). |
-| Módulo de Registro en Campo | Llegada con hora y ubicación validada; clientes sin dirección toman su ubicación en la primera visita; **vendedoras: una foto al inicio de la jornada**; **impulsadoras: foto del almacén y foto de la exhibición**; formularios con estimado de pedido, unidades, estado de cartera, faltantes con cantidades, gestión "Otros", observaciones de POP y la actividad Capacitación; **novedades posteriores al cierre**; modo sin conexión. |
+| Módulo de Registro en Campo | Llegada con hora y ubicación validada; clientes sin dirección toman su ubicación en la primera visita; **vendedoras: una foto al inicio de la jornada**; **impulsadoras: llegada y foto del almacén al empezar; unidades, faltantes y foto de la exhibición al cerrar el día**; formularios con estimado de pedido, unidades, estado de cartera, faltantes con cantidades, gestión "Otros", observaciones de POP y la actividad Capacitación; **novedades posteriores al cierre**; modo sin conexión. |
 | Módulo de Seguimiento | Resumen del Director Comercial: programadas y ejecutadas, gráficos, actividades y gestiones, evidencias fotográficas, pedidos estimados y unidades, faltantes, estado de cartera, novedades posteriores, desviaciones, mapa, detalle de cada visita y **exportación a Excel**. |
 
 No muestra nada de lo que está en exclusiones (integraciones, alertas por otros medios, optimización de rutas).
 
 ## Guion de la demo (7 minutos)
 
-1. **Ingreso:** hay un perfil por rol. Entra como **Dirección Comercial** (Edison Muñoz) y muestra el cumplimiento, los gráficos y la sección de gestión: actividades, faltantes, cartera y novedades.
+1. **Ingreso:** hay un perfil por rol. Entra como **Dirección Comercial** (Edison Muñoz) y muestra el cumplimiento, los gráficos y la sección de gestión: actividades, faltantes (pulsa una referencia para ver en qué puntos falta), cartera y novedades.
 2. **Carga por Excel:** en *Administración → Clientes* pulsa **Cargar desde Excel → Probar con un archivo de ejemplo**: se ven los clientes nuevos, los que se actualizan por código y las filas con error. Repite en *Planificación* con **Cargar programación desde Excel** y publica el plan.
-3. **Campo (impulsadora):** *Ver app de campo*. Primera visita: llegada → **foto del almacén** → **foto de la exhibición** → faltantes con cantidades, observaciones de POP, Capacitación → salida. La segunda visita es a un **cliente sin dirección**: al registrar la llegada, su ubicación queda guardada.
+3. **Campo (impulsadora):** *Ver app de campo*. Al llegar al almacén: **registrar llegada** y **foto del almacén**; la visita queda *en jornada*. Al final del día: **Cerrar la jornada** → unidades vendidas, faltantes con cantidades, POP y actividades → **foto de la exhibición**, que registra la salida. La segunda visita es a un **cliente sin dirección**: al registrar la llegada, su ubicación queda guardada.
 4. **Campo (vendedora):** cambia a *vendedora*. En la primera visita se pide la **foto de inicio de jornada**; en la segunda ya no. Muestra estimado de pedido, unidades, estado de cartera y la gestión *Otros*.
 5. **Novedad posterior:** *Visitas anteriores y novedades* → abre una visita cerrada → **Agregar** una devolución. El registro original no cambia.
 6. **Sin conexión:** activa *Sin conexión*, registra una visita y vuelve a *En línea* para sincronizar.

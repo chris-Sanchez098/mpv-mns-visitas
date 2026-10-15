@@ -63,11 +63,11 @@ export function DetalleVisita() {
             <div className="grid gap-3 sm:grid-cols-2">
               <figure>
                 <FotoVisita visita={v} punto={p} className="aspect-[4/3] w-full" />
-                <figcaption className="mt-1.5 text-sm text-gris">Llegada al almacén</figcaption>
+                <figcaption className="mt-1.5 text-sm text-gris">Llegada al almacén ({v.llegada})</figcaption>
               </figure>
               <figure>
                 <FotoVisita visita={v} punto={p} tipo="exhibicion" className="aspect-[4/3] w-full" />
-                <figcaption className="mt-1.5 text-sm text-gris">Exhibición de productos Natural Systems</figcaption>
+                <figcaption className="mt-1.5 text-sm text-gris">Exhibición al cierre del día ({v.salida})</figcaption>
               </figure>
             </div>
           ) : v.estado === 'realizada' && (v.foto || v.fotoSemilla) ? (
@@ -93,7 +93,7 @@ export function DetalleVisita() {
             <div className="flex aspect-[4/3] items-center justify-center rounded-xl border border-dashed border-linea bg-white p-8 text-center text-gris">
               {v.estado === 'no_realizada' && `No se realizó: ${v.motivoNoRealizacion}`}
               {v.estado === 'reprogramada' && `Reprogramada${v.reprogramadaPara ? ` para el ${fechaLarga(v.reprogramadaPara)}` : ''}`}
-              {v.estado === 'programada' && 'La visita aún no se ha registrado en campo.'}
+              {v.estado === 'programada' && (v.llegada ? `En jornada desde las ${v.llegada}. El cierre del día aún no se ha registrado.` : 'La visita aún no se ha registrado en campo.')}
             </div>
           )}
 

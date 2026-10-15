@@ -1,5 +1,5 @@
 import { ArrowLeft, Camera, Check, CheckCircle2, CloudOff, Info, Loader2, LogIn, LogOut, MapPin, MapPinPlus, Minus, Plus } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Camara } from '../../components/Camara'
 import { FotoVisita } from '../../components/FotoVisita'
@@ -9,7 +9,7 @@ import type { EstadoCartera, GestionImpulsadora, GestionVendedora, Listas, Visit
 import { fechaLarga, horaActual, hoyDemo, pesos, siguienteHabil } from '../../lib/fechas'
 import { useDemo } from '../../store'
 
-type Paso = 'llegada' | 'foto' | 'exhibicion' | 'formulario' | 'listo'
+type Paso = 'llegada' | 'foto' | 'jornada' | 'formulario' | 'exhibicion' | 'listo'
 
 export function FlujoVisita() {
   const { id } = useParams()
@@ -24,28 +24,34 @@ export function FlujoVisita() {
 
   // Vendedoras: una sola foto al inicio de la jornada, asociada a la primera visita del día
   const fotoJornada = v && esVendedora ? visitas.find((x) => x.usuarioId === v.usuarioId && x.fecha === v.fecha && x.id !== v.id && (x.foto || x.fotoSemilla)) : undefined
-  const pasos: { k: Exclude<Paso, 'listo'>; t: string }[] = esVendedora
+  // Impulsadoras: registran llegada y foto del almacén al empezar; al final del día cierran con
+  // unidades vendidas, faltantes y la foto de la exhibición.
+  const pasos: { k: Exclude<Paso, 'listo' | 'jornada'>; t: string }[] = esVendedora
     ? [{ k: 'llegada', t: 'Llegada' }, ...(fotoJornada ? [] : [{ k: 'foto' as const, t: 'Foto de jornada' }]), { k: 'formulario', t: 'Gestión' }]
     : [
         { k: 'llegada', t: 'Llegada' },
         { k: 'foto', t: 'Foto del almacén' },
-        { k: 'exhibicion', t: 'Exhibición' },
-        { k: 'formulario', t: 'Ejecución' },
+        { k: 'formulario', t: 'Cierre del día' },
+        { k: 'exhibicion', t: 'Foto exhibición' },
       ]
 
   const tieneFoto = (x: Visita) => !!(x.foto || x.fotoSemilla)
-  const tieneExhibicion = (x: Visita) => !!(x.fotoExhibicion || x.fotoExhibicionSemilla)
   const inicial: Paso = (() => {
     if (!v || v.estado !== 'programada') return 'listo'
     if (!v.llegada) return 'llegada'
     if (pasos.some((x) => x.k === 'foto') && !tieneFoto(v)) return 'foto'
-    if (pasos.some((x) => x.k === 'exhibicion') && !tieneExhibicion(v)) return 'exhibicion'
-    return 'formulario'
+    return esVendedora ? 'formulario' : 'jornada'
   })()
   const [paso, setPaso] = useState<Paso>(inicial)
   const [ubicando, setUbicando] = useState(false)
   const [noRealizada, setNoRealizada] = useState(false)
   const [recienCerrada, setRecienCerrada] = useState(false)
+  const [cierre, setCierre] = useState<GestionImpulsadora | null>(null)
+  // Cada paso empieza arriba de la pantalla
+  useEffect(() => {
+    document.getElementById('campo-scroll')?.scrollTo(0, 0)
+    window.scrollTo(0, 0)
+  }, [paso])
 
   if (!v || !p || !usuario) return <p className="p-4 text-gris">No encontramos esta visita.</p>
 
@@ -75,7 +81,8 @@ export function FlujoVisita() {
         {paso !== 'listo' && (
           <ol className="mt-3 flex gap-1.5" aria-label="Pasos de la visita">
             {pasos.map((x, i) => {
-              const idx = pasos.findIndex((y) => y.k === paso)
+              // En jornada: llegada y foto hechas, el cierre aún no empieza
+              const idx = paso === 'jornada' ? 1.5 : pasos.findIndex((y) => y.k === paso)
               const hecho = i < idx
               const actual = i === idx
               return (
@@ -184,28 +191,55 @@ export function FlujoVisita() {
               key="presencia"
               onFoto={(f) => {
                 guardarFoto(v.id, f, 'presencia')
-                siguiente('foto')
+                if (esVendedora) siguiente('foto')
+                else setPaso('jornada')
               }}
               onSinCamara={() => {
                 usarFotoDemo(v.id, 'presencia')
-                siguiente('foto')
+                if (esVendedora) siguiente('foto')
+                else setPaso('jornada')
               }}
             />
           </div>
         )}
 
+        {paso === 'jornada' && (
+          <div className="space-y-3">
+            <Bloque>
+              <div className="flex items-start gap-3">
+                <span className="relative mt-1 flex h-3 w-3 shrink-0">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-hoja opacity-60" />
+                  <span className="relative inline-flex h-3 w-3 rounded-full bg-hoja" />
+                </span>
+                <div>
+                  <div className="font-semibold">Jornada en curso desde las {v.llegada}</div>
+                  <p className="mt-1 text-sm text-gris">Llegada y foto del almacén registradas. Al final del día registra las unidades vendidas, los faltantes y la foto de la exhibición.</p>
+                </div>
+              </div>
+            </Bloque>
+            <FotoVisita visita={v} punto={p} className="aspect-[4/3] w-full" />
+            <Boton className="w-full py-4 text-base" onClick={() => setPaso('formulario')}>
+              <LogOut size={18} aria-hidden /> Cerrar la jornada
+            </Boton>
+          </div>
+        )}
+
         {paso === 'exhibicion' && (
           <div className="space-y-3">
-            <Indicacion>Foto de la exhibición: que se vean la ubicación y el estado de los productos de Natural Systems en la góndola.</Indicacion>
+            <Indicacion>Última foto del día: la exhibición, donde se vean la ubicación y el estado de los productos de Natural Systems. Al usarla se registra la salida.</Indicacion>
             <Camara
               key="exhibicion"
               onFoto={(f) => {
                 guardarFoto(v.id, f, 'exhibicion')
-                siguiente('exhibicion')
+                if (cierre) finalizarVisita(v.id, horaActual(), { impulsadora: cierre })
+                setRecienCerrada(true)
+                setPaso('listo')
               }}
               onSinCamara={() => {
                 usarFotoDemo(v.id, 'exhibicion')
-                siguiente('exhibicion')
+                if (cierre) finalizarVisita(v.id, horaActual(), { impulsadora: cierre })
+                setRecienCerrada(true)
+                setPaso('listo')
               }}
             />
           </div>
@@ -231,14 +265,18 @@ export function FlujoVisita() {
               />
             </>
           ) : (
+            <>
+            <p className="mb-3 rounded-xl bg-white p-3 text-sm text-gris">
+              <strong className="text-tinta">Cierre del día.</strong> Registra lo que pasó durante la jornada en {p.nombre}; al final se toma la foto de la exhibición.
+            </p>
             <FormImpulsadora
               listas={listas}
               onGuardar={(g) => {
-                finalizarVisita(v.id, horaActual(), { impulsadora: g })
-                setRecienCerrada(true)
-                setPaso('listo')
+                setCierre(g)
+                setPaso('exhibicion')
               }}
             />
+            </>
           ))}
 
         {paso === 'listo' && (
@@ -449,7 +487,9 @@ function FormImpulsadora({ listas, onGuardar }: { listas: Listas; onGuardar: (g:
           </Campo>
         </div>
       </Bloque>
-      <BotonSalida onClick={() => onGuardar({ ...g, competencia: g.competencia || 'Sin novedad', oportunidades: g.oportunidades || 'Ninguna', novedades: g.novedades || 'Sin novedades' })} />
+      <Boton type="submit" className="w-full py-4 text-base" onClick={() => onGuardar({ ...g, competencia: g.competencia || 'Sin novedad', oportunidades: g.oportunidades || 'Ninguna', novedades: g.novedades || 'Sin novedades' })}>
+        <Camera size={18} aria-hidden /> Continuar con la foto de la exhibición
+      </Boton>
     </form>
   )
 }

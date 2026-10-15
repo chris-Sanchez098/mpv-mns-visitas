@@ -58,7 +58,13 @@ export function RutaDelDia() {
                     {v.franja} · {v.objetivo}
                   </span>
                   <span className="mt-1.5 flex items-center gap-1.5">
-                    <EstadoChip estado={v.estado} pequeño />
+                    {v.estado === 'programada' && v.llegada ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-hoja-50 px-2 py-0.5 text-xs font-medium text-hoja">
+                        <span className="h-1.5 w-1.5 rounded-full bg-hoja" aria-hidden /> En jornada desde {v.llegada}
+                      </span>
+                    ) : (
+                      <EstadoChip estado={v.estado} pequeño />
+                    )}
                     {p?.ubicacionOrigen === 'pendiente' && <span className="rounded-full bg-cobalto-50 px-2 py-0.5 text-xs font-medium text-cobalto">Sin dirección</span>}
                     {v.sync === 'pendiente' && (
                       <span className="inline-flex items-center gap-1 text-xs text-ambar">

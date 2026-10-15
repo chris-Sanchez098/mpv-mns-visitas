@@ -172,13 +172,15 @@ export function generarDatos(): DatosDemo {
     dias.forEach((fecha) => {
       const esHoy = fecha === hoy
       let fotoJornada = false
-      const cantidad = esVen ? a.entre(5, 6) : a.entre(3, 4)
+      // La impulsadora suele estar todo el día en un almacén; algunos días cubre dos
+      const cantidad = esVen ? a.entre(5, 6) : esDemo ? 2 : a.r() < 0.7 ? 1 : 2
       const elegidos = a.varios(misPuntos, cantidad)
       // Hoy: la mitad de la ruta ya se hizo, salvo para los usuarios de la demo, que la recorren en vivo.
-      const hechasHoy = esDemo ? 0 : Math.floor(cantidad / 2)
+      // Las impulsadoras de hoy siguen en jornada: ya registraron llegada pero aún no cierran.
+      const hechasHoy = esDemo || !esVen ? 0 : Math.floor(cantidad / 2)
 
       elegidos.forEach((p, i) => {
-        const inicio = 8 * 60 + i * (esVen ? 75 : 120) + a.entre(0, 20)
+        const inicio = 8 * 60 + i * (esVen ? 75 : 330) + a.entre(0, 20)
         const fr = L.franjas[Math.min(3, Math.floor((inicio - 480) / 120))]
         const tipo = esVen ? a.uno(['Toma de pedido', 'Seguimiento', 'Cobro de cartera', 'Lanzamiento de producto']) : 'Impulso y asesoría'
         const objetivo = esVen ? a.uno(L.objetivos.slice(0, 4)) : a.uno(L.objetivos.slice(3))
@@ -210,8 +212,15 @@ export function generarDatos(): DatosDemo {
           sync: 'sincronizada',
         }
         if (estado === 'realizada') {
-          completar(v, esVen, inicio, !fotoJornada)
+          completar(v, esVen, inicio, !fotoJornada, esVen ? undefined : cantidad === 1 ? a.entre(480, 540) : a.entre(200, 260))
           fotoJornada = true
+        }
+        if (esHoy && !esVen && !esDemo && i === 0) {
+          // En jornada: llegada y foto del almacén registradas, cierre pendiente
+          v.llegada = `0${Math.floor(inicio / 60)}:${String(inicio % 60).padStart(2, '0')}`
+          v.fotoSemilla = a.entre(1, 9999)
+          v.enRango = true
+          v.distanciaM = a.entre(6, 90)
         }
         if (estado === 'no_realizada') v.motivoNoRealizacion = a.uno(L.motivosNoRealizacion)
         if (estado === 'reprogramada') {
@@ -222,7 +231,7 @@ export function generarDatos(): DatosDemo {
       })
 
       // Visitas no programadas: gestión adicional
-      if (!esDemo && (!esHoy || a.r() < 0.3) && a.r() < 0.35) {
+      if (!esDemo && (!esHoy || a.r() < 0.3) && a.r() < (esVen ? 0.35 : 0.1)) {
         const p = a.uno(misPuntos)
         const v: Visita = {
           id: `v-${++n}`,
@@ -249,8 +258,8 @@ export function generarDatos(): DatosDemo {
   }
 
   /** primeraDelDia: la vendedora solo toma foto en la primera visita de su jornada */
-  function completar(v: Visita, esVen: boolean, inicioMin: number, primeraDelDia: boolean) {
-    const dur = a.entre(25, 55)
+  function completar(v: Visita, esVen: boolean, inicioMin: number, primeraDelDia: boolean, duracion?: number) {
+    const dur = duracion ?? a.entre(25, 55)
     const hh = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
     v.llegada = hh(inicioMin)
     v.salida = hh(inicioMin + dur)
