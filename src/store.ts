@@ -23,6 +23,7 @@ interface Estado extends DatosDemo {
   cerrarAviso: (id: number) => void
 
   agregarUsuario: (u: Omit<Usuario, 'id'>) => void
+  aceptarTratamiento: (usuarioId: string) => void
   agregarPunto: (p: Omit<Punto, 'id'>) => void
   importarPuntos: (filas: Omit<Punto, 'id'>[]) => { nuevos: number; actualizados: number }
   importarPlan: (filas: Omit<Visita, 'id' | 'historial' | 'sync' | 'estado' | 'programada' | 'novedadesPosteriores'>[]) => { nuevas: number; actualizadas: number }
@@ -76,6 +77,8 @@ export const useDemo = create<Estado>()(
         },
         cerrarAviso: (id) => set((s) => ({ avisos: s.avisos.filter((a) => a.id !== id) })),
 
+        aceptarTratamiento: (usuarioId) =>
+          set((s) => ({ usuarios: s.usuarios.map((u) => (u.id === usuarioId ? { ...u, autorizacionDatos: `${hoyDemo()} ${horaActual()}` } : u)) })),
         agregarUsuario: (u) => set((s) => ({ usuarios: [...s.usuarios, { ...u, id: `u-nuevo-${Date.now()}` }] })),
         agregarPunto: (p) => set((s) => ({ puntos: [...s.puntos, { ...p, id: `p-nuevo-${Date.now()}` }] })),
         // El código del cliente evita duplicados: si ya existe, se actualiza

@@ -154,6 +154,12 @@ export function generarDatos(): DatosDemo {
     { id: 'u-dir-1', nombre: 'Edison Muñoz', perfil: 'direccion', zonas: [...zonas], telefono: tel(), activo: true },
   ]
 
+  // Autorización de tratamiento de datos: la aceptaron al ingresar por primera vez.
+  // Las usuarias de campo de la demo aún no, para mostrar el paso de aceptación.
+  usuarios.forEach((u, i) => {
+    if (u.id !== DEMO.impulsadora && u.id !== DEMO.vendedora) u.autorizacionDatos = `${dias[0]} 07:${String(40 + (i % 19)).padStart(2, '0')}`
+  })
+
   // Cumplimiento base por persona: dos personas quedan por debajo de la meta para mostrar desviaciones.
   const sesgo: Record<string, number> = { 'u-imp-16': 0.52, 'u-ven-2': 0.64, 'u-imp-9': 0.7 }
 

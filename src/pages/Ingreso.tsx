@@ -2,6 +2,7 @@ import { ClipboardList, LayoutDashboard, Settings2, ShoppingBag, Store } from 'l
 import { useNavigate } from 'react-router-dom'
 import { BarraDemo } from '../components/BarraDemo'
 import { Logo } from '../components/Marca'
+import { EnlacePolitica } from '../components/PoliticaDatos'
 import { DEMO } from '../data/mock'
 import { PERFIL_NOMBRE, type Perfil } from '../data/types'
 import { useDemo } from '../store'
@@ -74,6 +75,9 @@ export function Ingreso() {
                 )
               })}
             </ul>
+            <p className="mt-6 text-sm text-gris">
+              <EnlacePolitica className="font-medium text-cobalto" />
+            </p>
           </div>
         </section>
       </div>

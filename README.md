@@ -11,6 +11,8 @@ Prototipo navegable de la herramienta de **planificación y seguimiento de visit
 | Módulo de Registro en Campo | Llegada con hora y ubicación validada; clientes sin dirección toman su ubicación en la primera visita; **vendedoras: una foto al inicio de la jornada**; **impulsadoras: llegada y foto del almacén al empezar; unidades, faltantes y foto de la exhibición al cerrar el día**; formularios con estimado de pedido, unidades, estado de cartera, faltantes con cantidades, gestión "Otros", observaciones de POP y la actividad Capacitación; **novedades posteriores al cierre**; modo sin conexión. |
 | Módulo de Seguimiento | Resumen del Director Comercial: programadas y ejecutadas, gráficos, actividades y gestiones, evidencias fotográficas, pedidos estimados y unidades, faltantes, estado de cartera, novedades posteriores, desviaciones, mapa, detalle de cada visita y **exportación a Excel**. |
 
+**Protección de datos (Ley 1581 de 2012):** la primera vez que una persona de campo entra, acepta la autorización de tratamiento de datos (finalidades, datos que se recolectan, lo que la herramienta no hace y derechos del titular). La aceptación queda registrada con fecha y hora en *Administración → Usuarios*, y la política se puede consultar desde el ingreso, la app de campo y el panel. El texto es de demostración: la versión final la define la compañía con su asesoría legal.
+
 No muestra nada de lo que está en exclusiones (integraciones, alertas por otros medios, optimización de rutas).
 
 ## Guion de la demo (7 minutos)

@@ -15,6 +15,8 @@ export interface Usuario {
   zonas: string[]
   telefono: string
   activo: boolean
+  /** Fecha y hora en que aceptó la autorización de tratamiento de datos (Ley 1581 de 2012) */
+  autorizacionDatos?: string
 }
 
 export interface Punto {

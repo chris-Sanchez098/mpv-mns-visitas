@@ -2,12 +2,14 @@ import { CloudOff, LayoutDashboard, RefreshCw, Wifi } from 'lucide-react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { BarraDemo } from '../../components/BarraDemo'
 import { Logo } from '../../components/Marca'
+import { AutorizacionDatos } from '../../components/PoliticaDatos'
 import { DEMO } from '../../data/mock'
 import { PERFIL_NOMBRE } from '../../data/types'
 import { useDemo } from '../../store'
 
 export function CampoLayout() {
   const usuario = useDemo((s) => s.usuarios.find((u) => u.id === s.sesion))
+  const aceptar = useDemo((s) => s.aceptarTratamiento)
   const nav = useNavigate()
   const iniciar = useDemo((s) => s.iniciar)
 
@@ -19,7 +21,7 @@ export function CampoLayout() {
         <div className="flex w-full flex-col bg-niebla md:h-[820px] md:w-[400px] md:overflow-hidden md:rounded-[44px] md:border-[10px] md:border-tinta md:shadow-2xl">
           <EncabezadoApp nombre={usuario?.nombre ?? ''} perfil={usuario ? PERFIL_NOMBRE[usuario.perfil] : ''} />
           <div id="campo-scroll" className="flex-1 overflow-y-auto">
-            <Outlet />
+            {usuario && !usuario.autorizacionDatos ? <AutorizacionDatos nombre={usuario.nombre} onAceptar={() => aceptar(usuario.id)} /> : <Outlet />}
           </div>
         </div>
 

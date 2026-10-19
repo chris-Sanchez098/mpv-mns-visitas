@@ -1,6 +1,7 @@
 import { FileSpreadsheet, MapPin, MapPinOff, MapPinPlus, Plus, Search } from 'lucide-react'
 import { useState } from 'react'
 import { ImportarExcel } from '../../components/ImportarExcel'
+import { EnlacePolitica } from '../../components/PoliticaDatos'
 import { Boton, Campo, claseInput, claseSelect, Modal } from '../../components/ui'
 import { COLUMNAS_CLIENTES, descargarPlantilla, revisarClientes } from '../../lib/importar'
 import { fechaCorta } from '../../lib/fechas'
@@ -81,7 +82,8 @@ function Usuarios() {
         <p className="text-sm text-gris">
           {conteo('impulsadora')} impulsadoras, {conteo('vendedora')} vendedoras y {conteo('supervision') + conteo('administracion') + conteo('direccion')} usuarios de oficina
         </p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <EnlacePolitica className="mr-2 text-sm font-medium text-cobalto" />
           <label className="relative">
             <Search size={16} className="absolute top-1/2 left-3 -translate-y-1/2 text-gris" aria-hidden />
             <input className={`${claseInput} py-2 pl-9 text-sm`} placeholder="Buscar por nombre" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar usuario" />
@@ -92,13 +94,14 @@ function Usuarios() {
         </div>
       </div>
       <div className="overflow-x-auto rounded-2xl border border-linea bg-white">
-        <table className="w-full min-w-[720px] text-sm">
+        <table className="w-full min-w-[880px] text-sm">
           <thead className="border-b border-linea text-left text-xs text-gris">
             <tr>
               <th className="px-5 py-3 font-medium">Nombre</th>
               <th className="py-3 font-medium">Perfil</th>
               <th className="py-3 font-medium">Zonas</th>
               <th className="py-3 font-medium">Teléfono</th>
+              <th className="py-3 font-medium">Autorización de datos</th>
               <th className="px-5 py-3 font-medium">Estado</th>
             </tr>
           </thead>
@@ -109,6 +112,15 @@ function Usuarios() {
                 <td className="py-2.5">{PERFIL_NOMBRE[u.perfil]}</td>
                 <td className="py-2.5 text-gris">{u.zonas.length === listas.zonas.length ? 'Todas' : u.zonas.join(', ')}</td>
                 <td className="py-2.5 tabular">{u.telefono}</td>
+                <td className="py-2.5 text-xs tabular">
+                  {u.autorizacionDatos ? (
+                    <span className="text-hoja" title="Aceptó la autorización de tratamiento de datos">
+                      Aceptada {fechaCorta(u.autorizacionDatos.slice(0, 10))}, {u.autorizacionDatos.slice(11)}
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-ambar-50 px-2 py-0.5 font-medium text-ambar">Pendiente</span>
+                  )}
+                </td>
                 <td className="px-5 py-2.5">
                   <span className="rounded-full bg-hoja-50 px-2 py-0.5 text-xs font-medium text-hoja">Activo</span>
                 </td>

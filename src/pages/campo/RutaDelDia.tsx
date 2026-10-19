@@ -1,6 +1,7 @@
 import { ChevronRight, CloudOff, History, Plus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { EstadoChip } from '../../components/ui'
+import { EnlacePolitica } from '../../components/PoliticaDatos'
 import { capitalizar, fechaLarga, hoyDemo } from '../../lib/fechas'
 import { useDemo } from '../../store'
 
@@ -105,6 +106,9 @@ export function RutaDelDia() {
       <Link to="/campo/anteriores" className="mt-2 flex items-center justify-center gap-2 rounded-2xl p-3 text-sm font-semibold text-gris hover:bg-white">
         <History size={16} aria-hidden /> Visitas anteriores y novedades
       </Link>
+      <p className="mt-4 text-center text-xs text-gris">
+        <EnlacePolitica />
+      </p>
     </div>
   )
 }
